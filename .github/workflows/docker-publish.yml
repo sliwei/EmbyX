@@ -9,10 +9,10 @@ on:
       - 'README_zh.md'
   workflow_dispatch:
 
-# 使用 concurrency 结合延迟效果来实现类似“修改后30分钟构建”的需求是不太直接的。
-# 通常 GitHub Actions 在 push 后立即触发。
-# 如果需要“合并触发”，可以使用 workflow_run 或在 push 触发时先 sleep。
-# 但为了可靠性，这里采用标准的 push 触发，并配合并发限制。
+# 添加权限声明，确保可以推送到 GHCR
+permissions:
+  packages: write
+  contents: read
 
 jobs:
   docker:
@@ -34,6 +34,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase the repo name
+        run: echo "REPO_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >> ${GITHUB_ENV}
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -41,6 +44,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/embyx:latest
+            ghcr.io/${{ env.REPO_LOWER }}/embyx:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
