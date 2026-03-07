@@ -1,0 +1,2736 @@
+<!--
+  EmbyX - 短视频风格 Emby 播放器
+  © 2026 谢週五 (https://juneix.github.io)
+  著作权所有·设计与开发
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta name="referrer" content="no-referrer">
+
+    <link rel="manifest" href="manifest.json">
+
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <title>EmbyX</title>
+    <script src="https://cdn.tailwindcss.com" data-cfasync="false"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script data-cfasync="false">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#52B54B', // Emby绿
+                        secondary: '#EE3152' // 抖音红
+                    },
+                    fontFamily: {
+                        sans: ['PingFang SC', 'Helvetica Neue', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            /* 视频全屏样式 - 移除硬编码的 object-cover 给 JS 控制 */
+            .video-fullscreen {
+                @apply w-full h-full absolute inset-0 z-10;
+            }
+            
+            /* 滑动容器 */
+            /* 优化 2: 一般情况使用 100dvh 避开移动端浏览器地址栏遮挡。如果是 PWA 模式 (standalone) 强制换回 100vh 以消除底部安全区留黑缝隙 */
+            .slide-container {
+                @apply relative w-screen overflow-hidden bg-black;
+                height: 100dvh;
+            }
+            @media (display-mode: standalone) {
+                .slide-container {
+                    height: 100vh;
+                }
+            }
+            
+            /* 单个视频卡片 */
+            .slide-item {
+                @apply absolute top-0 left-0 w-full h-full z-10;
+            }
+            
+            /* 播放/暂停按钮动画 - 修复：提高 z-index 确保在视频之上 */
+            .play-pause-btn {
+                @apply absolute top-1/2 left-1/2 w-16 h-16 rounded-full flex items-center justify-center z-20 opacity-0 pointer-events-none transition-all duration-200 ease-out bg-black/30;
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+            .play-pause-btn.paused {
+                @apply opacity-100;
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+            .play-pause-btn i {
+                @apply text-2xl text-white;
+            }
+
+            /* 连播模式/清屏模式逻辑 */
+            .interface-hidden .bottom-info,
+            .interface-hidden .bottom-nav,
+            .interface-hidden .right-toolbar,
+            .interface-hidden #fullscreenBtn,
+            .interface-hidden #deleteBtn {
+                @apply opacity-0 pointer-events-none transition-opacity duration-300;
+            }
+
+            /* 格子视图下的特殊“清屏”：保留底部栏，隐藏播放器相关 UI */
+            .grid-active .bottom-info,
+            .grid-active .right-toolbar,
+            .grid-active #fullscreenBtn,
+            .grid-active #deleteBtn {
+                @apply opacity-0 pointer-events-none transition-opacity duration-300;
+            }
+            
+            /* 遥控器与键盘焦点高亮 */
+            .focusable-item:focus {
+                @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-black z-20;
+            }
+
+            /* “我的”页面层级过渡 */
+            .profile-layer {
+                @apply fixed top-0 left-0 w-full h-full z-[60] translate-y-full transition-transform duration-300 ease-in-out;
+            }
+            .profile-layer.active {
+                @apply translate-y-0;
+            }
+
+            /* 进度条 */
+            .progress-line {
+                @apply h-full bg-white transition-[width] duration-100 ease-linear;
+            }
+
+            /* MD3 & Liquid Glass: 底部导航反馈 */
+            .nav-btn {
+                @apply relative flex flex-col items-center justify-center w-1/4 h-full cursor-pointer transition-colors duration-300 z-10;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .nav-btn::before {
+                content: '';
+                @apply absolute top-1/2 left-1/2 w-[3.5rem] h-8 rounded-full bg-primary/30 opacity-0 pointer-events-none transition-all duration-500 ease-out z-[-1];
+                transform: translate(-50%, -50%) scale(0.5);
+                backdrop-filter: blur(8px);
+            }
+            .nav-btn.nav-clicked::before {
+                @apply opacity-100;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            .nav-btn.nav-clicked {
+                color: theme('colors.primary') !important;
+            }
+            .nav-btn.nav-clicked svg {
+                filter: drop-shadow(0 0 6px rgba(82, 181, 75, 0.6));
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-black text-white overflow-hidden font-sans select-none overscroll-none">
+    <div id="app" class="slide-container">
+
+        <div id="videoContainer" class="relative w-full h-full">
+        </div>
+
+        <div id="clickToPlayOverlay"
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/40 cursor-pointer"
+            style="display:none;">
+            <div class="text-center">
+                <div class="w-20 h-20 bg-black/50 rounded-full flex items-center justify-center animate-pulse mx-auto">
+                    <i data-lucide="play" class="text-white text-3xl"></i>
+                </div>
+                <p class="text-white text-lg mt-4 font-medium">点击开始播放</p>
+            </div>
+        </div>
+
+        <div
+            class="right-toolbar absolute right-4 bottom-40 flex flex-col items-center space-y-6 z-30 transition-opacity duration-300">
+            <div class="flex flex-col items-center cursor-pointer active:scale-90 transition-transform"
+                id="favoriteBtn">
+                <div class="w-12 h-12 flex items-center justify-center">
+                    <i data-lucide="heart" class="stroke-white w-6 h-6 drop-shadow-md"></i>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center cursor-pointer active:scale-90 transition-transform" id="scaleBtn">
+                <div class="w-12 h-12 flex items-center justify-center">
+                    <i data-lucide="maximize-2" class="stroke-white w-6 h-6 drop-shadow-md"></i>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center cursor-pointer active:scale-90 transition-transform" id="muteBtn">
+                <div class="w-12 h-12 flex items-center justify-center">
+                    <i data-lucide="volume-2" class="stroke-white w-6 h-6 drop-shadow-md"></i>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 左上角管理删除按钮，微调顶部距离，例如 1rem (16px) 或 10px -->
+        <div class="absolute top-[calc(10px+env(safe-area-inset-top))] left-4 z-30 transition-opacity duration-300"
+            id="deleteBtn">
+            <div
+                class="w-12 h-12 flex items-center justify-center cursor-pointer active:scale-90 transition-transform bg-black/30 rounded-full">
+                <i data-lucide="trash-2" class="stroke-white w-5 h-5 drop-shadow-md"></i>
+            </div>
+        </div>
+
+        <!-- 右上角全屏按钮，微调顶部距离，例如 1rem (16px) 或 10px -->
+        <div class="absolute top-[calc(10px+env(safe-area-inset-top))] right-4 z-30 transition-opacity duration-300"
+            id="fullscreenBtn">
+            <div
+                class="w-12 h-12 flex items-center justify-center cursor-pointer active:scale-90 transition-transform bg-black/30 rounded-full">
+                <i data-lucide="maximize" class="stroke-white w-5 h-5 drop-shadow-md"></i>
+            </div>
+        </div>
+
+        <div id="mediaInfoModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 hidden backdrop-blur-sm transition-opacity duration-300">
+            <div
+                class="bg-black/50 rounded-2xl p-6 w-[85%] max-w-sm max-h-[80vh] overflow-y-auto border border-gray-700/50 shadow-2xl backdrop-blur-sm">
+                <h3 class="text-white text-lg font-bold mb-4 text-center">
+                    流媒体信息
+                </h3>
+                <div id="mediaInfoContent" class="text-sm text-gray-300">
+                    <div class="flex justify-center py-4"><i data-lucide="loader-2"
+                            class="w-6 h-6 animate-spin text-gray-500"></i></div>
+                </div>
+                <button id="closeMediaInfoBtn"
+                    class="w-full mt-6 bg-gray-800/80 border border-gray-700/50 text-gray-200 py-2.5 rounded-lg font-medium hover:bg-gray-700 active:scale-95 transition-all">关闭</button>
+            </div>
+        </div>
+
+        <div id="deleteConfirmModal"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 hidden backdrop-blur-sm transition-opacity duration-300">
+            <div
+                class="bg-black/50 rounded-2xl p-6 w-[85%] max-w-sm border border-gray-700/50 shadow-2xl backdrop-blur-sm text-center">
+                <div
+                    class="w-14 h-14 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-secondary/20">
+                    <i data-lucide="trash-2" class="text-secondary w-7 h-7"></i>
+                </div>
+                <h3 class="text-white text-lg font-bold mb-2">删除媒体</h3>
+                <p class="text-secondary text-xs font-semibold px-4 mb-4 leading-relaxed">⚠️ 警告：将从 Emby 永久删除源文件！</p>
+                <div class="bg-gray-800/40 rounded-lg p-3 mb-6 border border-gray-700/30">
+                    <p id="deleteFileName" class="text-gray-300 text-xs break-all opacity-80"></p>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="cancelDeleteBtn"
+                        class="flex-1 bg-gray-800/80 border border-gray-700/50 text-gray-300 py-2.5 rounded-lg font-medium active:scale-95 transition-all">😍女菩萨留步</button>
+                    <button id="confirmDeleteBtn"
+                        class="flex-1 bg-secondary text-white py-2.5 rounded-lg font-bold active:opacity-90 shadow-lg shadow-secondary/20 transition-all">🚬妖孽走开</button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="bottom-info absolute bottom-20 left-4 right-4 z-20 transition-opacity duration-300 pointer-events-none">
+            <div id="videoInfoArea"
+                class="mb-3 pointer-events-auto w-[75%] pr-4 cursor-pointer active:opacity-75 transition-opacity">
+                <h3 id="videoTitle" class="text-white text-lg font-medium mb-1 drop-shadow-md truncate">正在初始化...</h3>
+                <p id="videoDescription" class="text-gray-200 text-sm line-clamp-2 drop-shadow-md opacity-90">
+                    请点击右下角“我的”进行服务器配置</p>
+            </div>
+
+            <div class="relative h-1 bg-white/30 cursor-pointer pointer-events-auto mb-1" id="progressBarContainer">
+                <div id="progressLine" class="progress-line w-0"></div>
+            </div>
+
+            <div class="flex justify-between text-xs text-gray-300 drop-shadow">
+                <span id="currentTime">00:00</span>
+                <span id="totalTime">00:00</span>
+            </div>
+        </div>
+
+        <div
+            class="bottom-nav absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity duration-300 pb-2 pt-1">
+            <div class="flex justify-around items-center h-12">
+                <div id="viewModeBtn" class="nav-btn text-gray-400">
+                    <i data-lucide="layout-grid" class="stroke-current w-5 h-5"></i>
+                </div>
+                <div id="playModeBtn" class="nav-btn text-gray-400">
+                    <i data-lucide="repeat" class="stroke-current w-5 h-5"></i>
+                </div>
+                <div id="libraryBtn" class="nav-btn text-gray-400">
+                    <i data-lucide="folder-open" class="stroke-current w-5 h-5"></i>
+                </div>
+                <div id="myBtn" class="nav-btn text-gray-400">
+                    <i data-lucide="user-round" class="stroke-current w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+
+        <div id="profilePage" class="profile-layer text-white">
+            <!-- 【透明度终极修正方案】 -->
+            <!-- 1. 下方专属背景层，仅在标题栏下方生效，彻底避开头部的双重背景叠加 -->
+            <div
+                class="absolute top-[calc(3.5rem+env(safe-area-inset-top))] bottom-0 left-0 w-full bg-black/50 backdrop-blur-sm pointer-events-none -z-10">
+            </div>
+
+            <!-- 2. 完全独立的悬浮标题栏。文字滑过此处下方时就会有毛玻璃透射感 -->
+            <div
+                class="absolute top-0 left-0 w-full h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-gray-700/50 bg-black/50 backdrop-blur-sm z-10 pt-[env(safe-area-inset-top)]">
+                <div class="flex items-center justify-center h-14 px-4 relative">
+                    <span class="font-bold text-lg">个人中心</span>
+                    <!-- 右上角向下箭头，已将原来的 right-4 改为了 right-5 稍微左移。如感到偏右可改 right-5.5 / right-6 寻找舒适点 -->
+                    <button id="closeProfileBtn"
+                        class="absolute text-gray-400 right-5 w-10 h-10 flex items-center justify-center active:text-gray-300 focusable-item rounded-full">
+                        <i data-lucide="chevron-down" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. 无背景的全局内容滚动层。因为无背景，所以滑到上半部分遮挡时，就会给标题栏贡献底部的文字重叠区 -->
+            <div class="absolute inset-0 overflow-y-auto overflow-x-hidden z-0">
+                <div class="pt-[calc(3.5rem+env(safe-area-inset-top))] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                    <!-- mt-5 让下方的服务器配置模块整体远离顶部标题栏，留出更多呼吸感 -->
+                    <div class="mb-5 mt-5">
+                        <h2 class="text-primary font-bold text-sm mb-5 flex items-center">
+                            <i data-lucide="server" class="w-4 h-4 mr-2"></i>服务器配置
+                        </h2>
+                        <div class="space-y-4 bg-gray-800/40 p-4 rounded-lg border border-gray-700/50">
+                            <div>
+                                <label class="text-gray-400 text-xs block mb-1.5">服务器地址</label>
+                                <input type="text" id="configServer" placeholder="非局域网请使用 https 协议*"
+                                    class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-gray-400 text-xs block mb-1.5">用户名</label>
+                                    <input type="text" id="configUser" placeholder="Username"
+                                        class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
+                                </div>
+                                <div>
+                                    <label class="text-gray-400 text-xs block mb-1.5">密码</label>
+                                    <input type="password" id="configPwd" placeholder="Password"
+                                        class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
+                                </div>
+                            </div>
+                            <div id="rowStatic" tabindex="0"
+                                class="focusable-item flex items-center justify-between py-2.5 px-3 bg-gray-900/40 rounded-lg border border-transparent hover:bg-gray-800/60 transition-all cursor-pointer group"
+                                onclick="document.getElementById('configStatic').click();">
+                                <label for="configStatic"
+                                    class="text-gray-300 text-sm cursor-pointer flex-1">直接播放（不转码）</label>
+                                <input type="checkbox" id="configStatic"
+                                    class="rounded text-primary bg-gray-700 border-none w-4 h-4 pointer-events-none"
+                                    checked>
+                            </div>
+                            <div id="rowAutoplay" tabindex="0"
+                                class="focusable-item flex items-center justify-between py-2.5 px-3 bg-gray-900/40 rounded-lg border border-transparent hover:bg-gray-800/60 transition-all cursor-pointer group"
+                                onclick="document.getElementById('configAutoplay').click();">
+                                <label for="configAutoplay"
+                                    class="text-gray-300 text-sm cursor-pointer flex-1">自动连播</label>
+                                <input type="checkbox" id="configAutoplay"
+                                    class="rounded text-primary bg-gray-700 border-none w-4 h-4 pointer-events-none"
+                                    checked>
+                            </div>
+                            <div id="rowDeleteMode" tabindex="0"
+                                class="focusable-item flex items-center justify-between py-2.5 px-3 bg-gray-900/40 rounded-lg border border-transparent hover:bg-gray-800/60 transition-all cursor-pointer group"
+                                onclick="document.getElementById('configDeleteMode').click();">
+                                <label for="configDeleteMode"
+                                    class="text-yellow-500/90 text-sm cursor-pointer flex-1 font-medium">允许删除媒体
+                                    ⚠️</label>
+                                <input type="checkbox" id="configDeleteMode"
+                                    class="rounded text-primary bg-gray-700 border-none w-4 h-4 pointer-events-none">
+                            </div>
+                            <div class="flex space-x-3 pt-2">
+                                <button id="resetConfigBtn"
+                                    class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-3 rounded-lg active:scale-95 transition-transform focusable-item">重置</button>
+                                <button id="saveConfigBtn"
+                                    class="flex-1 bg-primary hover:bg-primary/90 text-white text-sm py-3 rounded-lg font-bold active:opacity-80 shadow-lg shadow-primary/20 focusable-item">保存</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 分割线：
+                         如果上下距离视觉不一致，可以分别修改下面的 mt-5 (距上缘) 和 mb-5 (距下缘)。
+                         常用的数值比例： 4(16px), 6(24px), 8(32px), 10(40px)
+                    -->
+                    <div class="border-t border-dashed border-gray-600 w-full mt-5 mb-5">
+                    </div>
+
+                    <div>
+                        <h2 class="text-primary font-bold text-sm mb-5 flex items-center">
+                            <i data-lucide="badge-info" class="w-4 h-4 mr-2"></i>关于项目
+                        </h2>
+                        <div
+                            class="bg-gray-800/40 p-5 rounded-xl border border-gray-700/50 space-y-5 text-sm text-gray-300 leading-relaxed">
+                            <div class="flex items-center">
+                                <h3 class="text-white font-bold text-2xl tracking-tight">📱 EmbyX</h3>
+                                <span
+                                    class="ml-2 px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full border border-primary/30">v1.0</span>
+                            </div>
+
+                            <div>
+                                <p class="text-gray-300">👋 Hi～我叫<a href="https://juneix.github.io" target="_blank"
+                                        class="text-primary hover:underline">@谢週五</a>，EmbyX 是一款专为 Emby / Jellyfin 打造的
+                                    Web 原生应用，完美复刻短视频沉浸式交互，让你的私人媒体库焕发全新的刷片体验。🎉</p>
+                            </div>
+
+                            <div
+                                class="text-yellow-500/90 text-xs bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
+                                <i data-lucide="alert-triangle" class="w-3 h-3 mr-1 inline"></i>
+                                提醒：数据本地存储，不上传云端；项目开源，可私有化部署。
+                            </div>
+
+                            <div>
+                                <h4 class="text-gray-300">🔮 播放性能</h4>
+                                <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                                    <li>原生 HTML5 播放器，新设备体验最佳</li>
+                                    <li>直接播放 <code
+                                            class="bg-gray-700 px-1 rounded text-xs text-gray-200"> Direct Play</code>，安卓
+                                        8K、AV1 不转码</li>
+                                    <li>老设备需服务器转码，<del>不如放到**上回收了(没打钱</del>😂</li>
+                                </ul>
+                                <div class="bg-black/40 rounded-lg overflow-hidden border border-gray-700/50 mt-3">
+                                    <table class="w-full text-center text-[11px] leading-tight border-collapse">
+                                        <thead class="bg-gray-700/30 text-gray-400">
+                                            <tr>
+                                                <th class="px-2 py-1.5 border-r border-gray-700/50 font-medium">设备</th>
+                                                <th class="px-2 py-1.5 border-r border-gray-700/50 font-medium">HEVC 硬解
+                                                </th>
+                                                <th class="px-2 py-1.5 font-medium">AV1 硬解</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-700/50 text-gray-400">
+                                            <tr>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50 text-primary">
+                                                    苹果</td>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50">A9 (2015) / M1</td>
+                                                <td class="px-2 py-1.5">A17 Pro (2023) / M3</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50 text-primary">
+                                                    安卓</td>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50">千元机 (2016)</td>
+                                                <td class="px-2 py-1.5">千元机 (2024)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50 text-primary">
+                                                    PC</td>
+                                                <td class="px-2 py-1.5 border-r border-gray-700/50">6～8 代酷睿·核显</td>
+                                                <td class="px-2 py-1.5">11 代酷睿·核显</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-gray-300">🧩 使用技巧</h4>
+                                <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                                    <li>配置建议：新建专用账号，每个媒体库 < 1000 个视频</li>
+                                    <li>PWA应用：全平台浏览器 📲 添加到主屏幕/作为应用安装</li>
+                                    <li>键鼠适配：电脑、电视浏览器也能快乐摸鱼</li>
+                                </ul>
+                            </div>
+
+                            <div>
+                                <h4 class="text-gray-300">⌨️ 快捷键指南</h4>
+                                <div class="bg-black/40 rounded-lg overflow-hidden border border-gray-700/50 mt-2">
+                                    <table class="w-full text-center text-[11px] leading-tight">
+                                        <thead class="bg-gray-700/30 text-gray-400">
+                                            <tr>
+                                                <th class="px-3 py-1.5 font-medium border-r border-gray-700/50">按键</th>
+                                                <th class="px-3 py-1.5 font-medium">功能</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-700/50 text-gray-400">
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">W / S /
+                                                    ↑ / ↓</td>
+                                                <td class="px-3 py-1.5">上一个 / 下一个视频</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">A / D /
+                                                    ← / →</td>
+                                                <td class="px-3 py-1.5">快退 / 快进 15 秒</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">Space /
+                                                    单击 OK</td>
+                                                <td class="px-3 py-1.5">暂停 / 播放</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">U / 双击
+                                                    OK</td>
+                                                <td class="px-3 py-1.5">收藏视频</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">J / 菜单键
+                                                </td>
+                                                <td class="px-2 py-1.5">比例切换</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">M</td>
+                                                <td class="px-3 py-1.5">音量开关</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">I</td>
+                                                <td class="px-3 py-1.5">个人中心</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">E</td>
+                                                <td class="px-3 py-1.5">视图切换</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">R</td>
+                                                <td class="px-3 py-1.5">顺序 / 随机</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">F</td>
+                                                <td class="px-3 py-1.5">全屏切换</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">G</td>
+                                                <td class="px-3 py-1.5">选择媒体源</td>
+                                            </tr>
+
+                                            <tr>
+                                                <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">V</td>
+                                                <td class="px-3 py-1.5">流媒体详情</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-gray-300">🚀 交流与支持</h4>
+                                <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs mt-3">
+                                    <li><span class="text-gray-300 font-medium">打赏鼓励：</span>支持我开发更多有趣应用</li>
+                                    <li><span class="text-gray-300 font-medium">互动群聊：</span>加入<a
+                                            href="mqqapi://card/show_pslcard?src_type=internal&version=1&uin=646913307&card_type=group&source=qrcode"
+                                            class="text-primary hover:underline">💬QQ 群</a>可在线催更</li>
+                                    <li><span class="text-gray-300 font-medium">更多内容：</span>访问➡️<a
+                                            href="https://5nav.eu.org" target="_blank"
+                                            class="text-primary hover:underline">谢週五の藏经阁</a></li>
+                                </ul>
+                                <div class="flex justify-center space-x-3 mt-4">
+                                    <a href="weixin://profile/gh_86f7c0a73738">
+                                    <div class="flex flex-col items-center">
+                                        <img src="/wechat.webp" alt="微信" class="w-24 h-24 object-cover rounded">
+                                        <span class="text-[10px] text-gray-400 mt-1">微信</span>
+                                    </div>
+                                    </a>
+                                    <a href="alipays://platformapi/startapp?saId=10000007&clientVersion=3.7.0.0718&qrcode=https%3A%2F%2Fqr.alipay.com%2Ffkx15248wilbz2ddz96og40">
+                                    <div class="flex flex-col items-center">
+                                        <img src="/alipay.webp" alt="支付宝" class="w-24 h-24 object-cover rounded">
+                                        <span class="text-[10px] text-gray-400 mt-1">支付宝</span>
+                                    </div>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div
+                                class="pt-4 border-t border-gray-700/50 text-xs text-gray-500 text-center flex flex-col space-y-1">
+                                <p>Made with ❤️ by <a href="https://juneix.github.io" target="_blank"
+                                        class="text-primary hover:underline">谢週五</a></p>
+                                <p>© 2026 保留所有权利</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="libraryModal"
+            class="fixed inset-0 bg-black/20 z-50 flex items-center justify-center hidden backdrop-blur-sm transition-opacity duration-300">
+            <div
+                class="bg-black/50 rounded-xl p-5 w-[90%] max-w-lg max-h-[70vh] overflow-y-auto border border-gray-700/50 shadow-2xl backdrop-blur-sm">
+                <h3 class="text-white text-lg font-bold mb-4 text-center">选择媒体源</h3>
+                <div id="librariesList" class="grid grid-cols-2 gap-2"></div>
+                <button id="closeLibraryBtn"
+                    class="w-full mt-4 bg-white/10 border border-white/10 text-gray-300 py-2.5 rounded text-sm hover:bg-white/20 font-medium active:scale-95 transition-all focusable-item">关闭</button>
+            </div>
+        </div>
+
+        <div id="toast"
+            class="fixed top-16 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-2 rounded-2xl text-white text-sm pointer-events-none transition-opacity duration-300 opacity-0 z-[100] w-max max-w-[80vw] whitespace-normal text-center border border-white/10 backdrop-blur-sm">
+            提示信息
+        </div>
+        <div id="loading"
+            class="fixed inset-0 z-40 flex items-center justify-center bg-transparent pointer-events-none hidden">
+            <div class="w-10 h-10 border-4 border-gray-600 border-t-primary rounded-full animate-spin"></div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * EmbyX Core Logic
+         * 包含配置管理、播放器核心、UI 交互、手势控制
+         */
+        class EmbyApp {
+            constructor() {
+                // 应用状态
+                this.state = {
+                    videos: [],
+                    currentIndex: 0,
+                    isPlaying: false,
+                    favorites: new Set(),
+                    playMode: 'sequence',
+                    viewMode: 'stream',
+                    isAutoplay: true,
+                    currentTab: 'home',
+                    currentLibraryId: null,
+                    isScaleFill: true,
+                    isMuted: false,
+                    originalVideos: []  // 随机模式下保存原始顺序列表
+                };
+
+                this.config = { server: '', user: '', token: '', userId: '', useStatic: true, autoplay: true, deleteMode: false };
+
+                // 计时器引用
+                this.csTimer = null;
+
+                this.dom = {}; // DOM 元素缓存
+                this.init();
+            }
+
+            // 检查当前是否有任何弹窗/面板处于打开状态
+            // 这种状态下不应触发自动清屏
+            isAnyModalOpen() {
+                const modals = ['mediaInfoModal', 'deleteConfirmModal', 'profilePage', 'libraryModal'];
+                return modals.some(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return false;
+                    // profilePage 使用 active 类名，其他使用 hidden 类名
+                    if (id === 'profilePage') return el.classList.contains('active');
+                    return !el.classList.contains('hidden');
+                });
+            }
+
+            // --- 初始化 ---
+            init() {
+                this.cacheDOM();
+                this.loadConfig();
+                this.loadFavorites();
+                this.bindEvents();
+
+                // 根据配置设置自动连播状态（只影响视频自动播放，不隐藏界面）
+                this.state.isAutoplay = this.config.autoplay !== false;
+
+                // 初始化视图模式按钮图标（默认竖版，显示gallery-vertical）
+                const viewBtn = this.dom.viewModeBtn;
+                viewBtn.innerHTML = `<i data-lucide="gallery-vertical" class="stroke-current w-5 h-5"></i>`;
+
+                // 初始化播放模式按钮图标（根据自动连播配置）
+                const playBtn = this.dom.playModeBtn;
+                playBtn.innerHTML = `<i data-lucide="${this.state.isAutoplay ? 'repeat' : 'repeat-1'}" class="stroke-current w-5 h-5"></i>`;
+
+                lucide.createIcons();
+
+                // 检查配置并启动
+                if (this.config.server && this.config.token) {
+                    this.fetchVideos();
+                } else {
+                    setTimeout(() => this.toggleModal('profilePage', true), 500);
+                }
+            }
+
+            cacheDOM() {
+                const ids = [
+                    'videoContainer', 'clickToPlayOverlay', 'loading', 'toast',
+                    'videoInfoArea', 'videoTitle', 'videoDescription', 'progressLine', 'currentTime', 'totalTime',
+                    'playModeBtn', 'viewModeBtn', 'libraryBtn', 'myBtn',
+                    'favoriteBtn', 'scaleBtn', 'muteBtn', 'fullscreenBtn', 'deleteBtn',
+                    'mediaInfoModal', 'mediaInfoContent', 'closeMediaInfoBtn',
+                    'deleteConfirmModal', 'confirmDeleteBtn', 'cancelDeleteBtn', 'deleteFileName',
+                    'configServer', 'configUser', 'configPwd', 'configStatic', 'configAutoplay', 'configDeleteMode'
+                ];
+                ids.forEach(id => this.dom[id] = document.getElementById(id));
+                this.dom.rightToolbar = document.querySelector('.right-toolbar');
+            }
+
+            // --- 配置与数据管理 ---
+            loadConfig() {
+                this.config.server = localStorage.getItem('emby_server') || '';
+                this.config.user = localStorage.getItem('emby_user') || '';
+                this.config.token = localStorage.getItem('emby_token') || '';
+                this.config.userId = localStorage.getItem('emby_uid') || '';
+                this.config.useStatic = localStorage.getItem('emby_static') !== 'false';
+                this.config.autoplay = localStorage.getItem('emby_autoplay') !== 'false';
+                this.config.deleteMode = localStorage.getItem('emby_delete_mode') === 'true';
+
+                // 填充 UI
+                if (this.dom.configServer) this.dom.configServer.value = this.config.server;
+                if (this.dom.configUser) this.dom.configUser.value = this.config.user;
+                if (this.dom.configPwd && this.config.token) {
+                    // 显示与实际密码位数一致的掩码（密码长度存入 localStorage，不存密码本身）
+                    const pwdLen = parseInt(localStorage.getItem('emby_pwd_len') || '0');
+                    this.dom.configPwd.value = '*'.repeat(Math.max(1, pwdLen));
+                }
+                if (this.dom.configStatic) this.dom.configStatic.checked = this.config.useStatic;
+                if (this.dom.configAutoplay) this.dom.configAutoplay.checked = this.config.autoplay;
+                if (this.dom.configDeleteMode) this.dom.configDeleteMode.checked = this.config.deleteMode;
+
+                // Sync UI based on config
+                this.dom.deleteBtn.style.display = this.config.deleteMode ? 'flex' : 'none';
+                if (this.dom.playModeBtn) {
+                    this.dom.playModeBtn.innerHTML = `<i data-lucide="${this.config.autoplay ? 'repeat' : 'repeat-1'}" class="stroke-current w-5 h-5"></i>`;
+                    lucide.createIcons();
+                }
+            }
+
+            // 核心修改点：AuthenticateByName 登录逻辑
+            async saveConfig() {
+                const server = this.dom.configServer.value.trim().replace(/\/$/, "");
+                const user = this.dom.configUser.value.trim();
+                const pwd = this.dom.configPwd.value.trim();
+                const isStatic = this.dom.configStatic.checked;
+                const autoplay = this.dom.configAutoplay.checked;
+                const deleteMode = this.dom.configDeleteMode.checked;
+
+                if (!server || !user) return this.showToast('请填写完整信息');
+
+                this.toggleLoading(true);
+                try {
+                    // 如果是用旧 token 更新设置，跳过登录
+                    if (pwd === '****' && this.config.token && this.config.server === server && this.config.user === user) {
+                        localStorage.setItem('emby_static', isStatic);
+                        localStorage.setItem('emby_autoplay', autoplay);
+                        localStorage.setItem('emby_delete_mode', deleteMode);
+                        this.config.useStatic = isStatic;
+                        this.config.autoplay = autoplay;
+                        this.config.deleteMode = deleteMode;
+                        this.state.isAutoplay = autoplay;
+
+                        this.dom.deleteBtn.style.display = deleteMode ? 'flex' : 'none';
+                        if (this.dom.playModeBtn) {
+                            this.dom.playModeBtn.innerHTML = `<i data-lucide="${autoplay ? 'repeat' : 'repeat-1'}" class="stroke-current w-5 h-5"></i>`;
+                            lucide.createIcons();
+                        }
+
+                        this.showToast('✅ 配置已保存');
+                        this.toggleModal('profilePage', false);
+                        return; // 提前退出，不重新拉取视频
+                    }
+
+                    const res = await fetch(`${server}/emby/Users/AuthenticateByName`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.0"`
+                        },
+                        body: JSON.stringify({ Username: user, Pw: pwd })
+                    });
+                    // 先按状态码分流，再尝试解析 JSON（避免非 JSON 响应体导致 json() 报错）
+                    if (res.status === 401) {
+                        this.showToast('认证失败：用户名或密码错误');
+                        return;
+                    } else if (res.status === 404) {
+                        this.showToast('连接失败：请检查端口号');
+                        return;
+                    } else if (!res.ok) {
+                        this.showToast(`连接失败 ${res.status}，请检查 Emby 日志`);
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    if (data.AccessToken) {
+                        // 登录成功...
+                        localStorage.setItem('emby_server', server);
+                        localStorage.setItem('emby_user', user);
+                        localStorage.setItem('emby_token', data.AccessToken);
+                        localStorage.setItem('emby_uid', data.SessionInfo.UserId);
+                        localStorage.setItem('emby_static', isStatic);
+                        localStorage.setItem('emby_autoplay', autoplay);
+                        localStorage.setItem('emby_delete_mode', deleteMode);
+
+                        this.config = { server, user, token: data.AccessToken, userId: data.SessionInfo.UserId, useStatic: isStatic, autoplay, deleteMode };
+
+                        // 将密码位数存入 localStorage，不存密码本身；空密码至少显示 1 个 *
+                        const pwdLen = Math.max(1, pwd.length);
+                        localStorage.setItem('emby_pwd_len', pwdLen);
+                        this.dom.configPwd.value = '*'.repeat(pwdLen);
+                        this.dom.deleteBtn.style.display = deleteMode ? 'flex' : 'none';
+                        if (this.dom.playModeBtn) {
+                            this.dom.playModeBtn.innerHTML = `<i data-lucide="${autoplay ? 'repeat' : 'repeat-1'}" class="stroke-current w-5 h-5"></i>`;
+                            lucide.createIcons();
+                        }
+
+                        this.showToast('✅ 配置已保存');
+                        this.toggleModal('profilePage', false);
+                        this.fetchVideos();
+                    } else {
+                        this.showToast('认证失败：用户名或密码错误');
+                    }
+                } catch (e) {
+                    console.error('saveConfig error:', e);
+                    // 分辨常见错误类型
+                    const msg = e?.message || '';
+                    const isHttps = location.protocol === 'https:';
+                    const targetHttp = server.startsWith('http:');
+                    if (isHttps && targetHttp) {
+                        // HTTPS 页面请求 HTTP Emby 会被浏览器拦截（Mixed Content）
+                        this.showToast('请求被拦截：非局域网不允许 http 协议');
+                    } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('ERR_CONNECTION')) {
+                        this.showToast('无法连接服务器');
+                    } else {
+                        this.showToast('连接失败：' + (msg || '未知错误'));
+                    }
+                } finally {
+                    this.toggleLoading(false);
+                }
+            }
+
+            resetConfig() {
+                if (confirm('确定要重置所有配置吗？')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            }
+
+            async loadFavorites() {
+                const { server, token, userId } = this.config;
+                if (!server || !token || !userId) {
+                    const saved = localStorage.getItem('emby_favorites');
+                    if (saved) this.state.favorites = new Set(JSON.parse(saved));
+                    return;
+                }
+                try {
+                    const res = await fetch(`${server}/emby/Users/${userId}/Items?api_key=${token}&Recursive=true&Filters=IsFavorite&Fields=Id`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.Items) {
+                            this.state.favorites = new Set(data.Items.map(i => String(i.Id)));
+                            localStorage.setItem('emby_favorites', JSON.stringify([...this.state.favorites]));
+                            this.updateUI();
+                        }
+                    }
+                } catch (e) {
+                    console.error('加载远端收藏夹失败:', e);
+                    const saved = localStorage.getItem('emby_favorites');
+                    if (saved) this.state.favorites = new Set(JSON.parse(saved));
+                }
+            }
+
+            // --- 核心播放逻辑 ---
+            async fetchVideos(parentId = null, ids = null, isLoadMore = false, isRandom = false) {
+                this.toggleLoading(true);
+                try {
+                    const { server, token, userId } = this.config;
+                    if (!server || !token) {
+                        this.showToast('请先配置服务器');
+                        return;
+                    }
+
+                    if (!isLoadMore) {
+                        this.state.startIndex = 0;
+                    }
+
+                    const libraryId = parentId || this.state.currentLibraryId;
+
+                    // --- 分页参数 ---
+                    // PAGE_SIZE: 每页视频数，建议 99（3 列整行）每次请求量
+                    // MAX_GRID_VIDEOS: 格子视图展示上限，超出部分通过翻页访问
+                    const PAGE_SIZE = 99;          // 可调整，建议保持 3 的倍数
+                    // const MAX_GRID_VIDEOS = 1000; // 硬性上限，目前由 API TotalRecordCount 控制，留作后期限速使用
+
+                    let url = `${server}/emby/Users/${userId}/Items?api_key=${token}&Recursive=true&IncludeItemTypes=Video&Limit=${PAGE_SIZE}&StartIndex=${this.state.startIndex || 0}&Fields=Overview,Path,RunTimeTicks,MediaSources`;
+
+                    if (ids) {
+                        url += `&Ids=${ids}`;
+                    } else if (isRandom) {
+                        // 换一批模式：服务端随机取 99 个（适用于所有模式）
+                        url += `&SortBy=Random`;
+                        if (libraryId && libraryId !== 'favorites') url += `&ParentId=${libraryId}`;
+                        if (libraryId === 'favorites') url += `&Filters=IsFavorite`;
+                    } else if (libraryId === 'favorites') {
+                        url += `&SortBy=DateCreated&SortOrder=Descending&Filters=IsFavorite`;
+                    } else if (libraryId) {
+                        // 指定媒体库：按添加时间倒序 + 分页
+                        url += `&SortBy=DateCreated&SortOrder=Descending&ParentId=${libraryId}`;
+                    } else {
+                        // 全部视频（未选媒体库）：默认按无添加时间倒序，点击换一批才随机
+                        url += `&SortBy=DateCreated&SortOrder=Descending`;
+                    }
+
+                    const res = await fetch(url);
+                    if (!res.ok) {
+                        throw new Error(`服务器错误: ${res.status}`);
+                    }
+                    let data = await res.json();
+
+                    if (data && data.Items && data.Items.length > 0) {
+                        this.state.videos = data.Items;
+                        this.state.currentIndex = 0;
+                        // 保存媒体库真实总数（API 返回，不受 Limit 影响）供分页显示
+                        this.state.totalCount = data.TotalRecordCount || 0;
+
+                        // 随机模式下加载完，直接原地洗牌（保持第一个视频在首位）
+                        if (this.state.playMode === 'random') {
+                            this.state.originalVideos = [...this.state.videos];
+                            this._shuffleAroundCurrent();
+                        }
+
+                        if (this.state.viewMode === 'grid') {
+                            this.renderGridView();
+                        } else {
+                            this.renderSlides();
+                            this.loadVideo(0);
+                        }
+                    } else if (isLoadMore) {
+                        this.showToast('没有更多视频了');
+                        // 已到最后一页，不循环
+                        this.state.startIndex = Math.max(0, (this.state.startIndex || 0));
+                        this.toggleLoading(false);
+                        return;
+                    } else {
+                        this.showToast('没有找到视频');
+                        this.dom.videoContainer.innerHTML = '';
+                    }
+                } catch (e) {
+                    console.error('获取视频失败:', e);
+                    this.showToast('无法连接服务器: ' + (e.message || '未知错误'));
+                } finally {
+                    this.toggleLoading(false);
+                }
+            }
+
+            /**
+             * 核心修改点：渲染视频卡片结构 (三窗格复用 DOM)
+             */
+            renderSlides() {
+                this.dom.videoContainer.innerHTML = '';
+                this.dom.videoContainer.className = 'relative w-full h-full transition-transform duration-300 ease-out';
+                this.dom.videoContainer.style.transform = `translateY(-${this.state.currentIndex * 100}%)`;
+
+                // 只初始化 3 个物理槽位
+                for (let i = 0; i < 3; i++) {
+                    const el = document.createElement('div');
+                    el.className = 'slide-item';
+                    el.id = `slide-${i}`;
+                    el.style.display = 'none';
+                    el.innerHTML = `
+                        <div class="w-full h-full relative bg-black">
+                            <!-- 封面缩略图： cover 模式下可见（视频加载前占位），contain 模式下隐藏（模糊背景处理背景） -->
+                            <img id="thumb-${i}" class="absolute inset-0 w-full h-full object-cover z-0 ${this.state.isScaleFill ? '' : 'opacity-0'}" src="" alt="" />
+                            <!-- 高斯模糊背景（contain 模式下可见，cover 模式下透明）。使用 scale-[1.15] 避免模糊边缘向内渐隐导致光晕/暗角特效 -->
+                            <div id="poster-${i}" class="absolute inset-0 bg-cover bg-center scale-[1.15] blur-xl transition-opacity duration-300 z-0 ${this.state.isScaleFill ? 'opacity-0' : 'opacity-70'}"></div>
+                            <div id="overlay-${i}" class="absolute inset-0 bg-black/40 transition-opacity duration-300 z-0 ${this.state.isScaleFill ? 'opacity-0' : 'opacity-100'}"></div>
+                            
+                            <!-- 视频层：初始透明，于 canplay 时淡入覆盖封面 -->
+                            <video id="video-p${i}" class="video-fullscreen ${this.state.isScaleFill ? 'object-cover' : 'object-contain'} opacity-0 transition-opacity duration-500 z-10" playsinline webkit-playsinline muted autoplay></video>
+                            
+                            <!-- 遅罩层：置于视频之上以屏蔽长按啇出的系统原生下载菜单 -->
+                            <div class="touch-layer absolute inset-0 z-20" style="-webkit-touch-callout: none;"></div>
+                            
+                            <div id="playBtn-${i}" class="play-pause-btn">
+                                <i data-lucide="play" class="stroke-white w-8 h-8"></i>
+                            </div>
+                        </div>
+                    `;
+                    this.dom.videoContainer.appendChild(el);
+                }
+                this.dom.slides = [
+                    document.getElementById('slide-0'),
+                    document.getElementById('slide-1'),
+                    document.getElementById('slide-2')
+                ];
+
+                lucide.createIcons();
+                this.updateUI();
+            }
+
+            renderGridView() {
+                this.dom.slides = null;
+                const container = this.dom.videoContainer;
+                container.innerHTML = '';
+                // 先禁用过渡再重置 transform，避免 stream 模式的 translateY 动画在切换时短暂错位
+                container.style.transition = 'none';
+                container.style.transform = 'none';
+                // 完全重置为绝对定位的、可滚动的原生网格层
+                container.className = 'absolute inset-0 z-10 bg-black/40 overflow-hidden flex flex-col';
+
+                // 背景海报模糊层
+                const currentVideo = this.state.videos[this.state.currentIndex];
+                const bgPosterStr = currentVideo ? this.getImageSrc(currentVideo) : '';
+                const bgLayer = document.createElement('div');
+                bgLayer.className = 'absolute inset-0 bg-cover bg-center opacity-70 scale-[1.15] blur-xl z-[-1] pointer-events-none';
+                if (bgPosterStr) {
+                    const imgL = new Image();
+                    imgL.crossOrigin = 'anonymous';
+                    imgL.referrerPolicy = 'no-referrer';
+                    imgL.src = bgPosterStr;
+                    imgL.onerror = () => {
+                        bgLayer.style.backgroundImage = `url('${this.getImageSrc(null)}')`;
+                    };
+                    bgLayer.style.backgroundImage = `url('${bgPosterStr}')`;
+                }
+                container.appendChild(bgLayer);
+
+                const gridWrapper = document.createElement('div');
+                const safeHeader = document.createElement('div');
+
+                let libraryName = '全部视频';
+                if (this.state.currentLibraryId === 'favorites') {
+                    libraryName = '收藏夹';
+                } else if (this.state.currentLibraryId) {
+                    const libIdStr = String(this.state.currentLibraryId);
+                    // 尝试从视图/播放列表数据缓存中寻找库名
+                    const cachedViewsStr = localStorage.getItem('emby_views_cache');
+                    if (cachedViewsStr) {
+                        try {
+                            const cached = JSON.parse(cachedViewsStr);
+                            let found = null;
+                            if (cached.views && cached.views.Items) {
+                                found = cached.views.Items.find(i => String(i.Id) === libIdStr);
+                            }
+                            if (!found && cached.playlists && cached.playlists.Items) {
+                                found = cached.playlists.Items.find(i => String(i.Id) === libIdStr);
+                            }
+                            if (found) libraryName = found.Name;
+                        } catch (e) { }
+                    }
+                }
+
+                const PAGE_SIZE = 99; // 与 fetchVideos 中保持一致
+                const totalCount = this.state.totalCount || 0;
+                const startIndex = this.state.startIndex || 0;
+                const currentPage = Math.floor(startIndex / PAGE_SIZE) + 1;
+                const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+                const isSpecificLib = !!this.state.currentLibraryId; // 是否选了具体媒体库
+                const showPager = isSpecificLib && totalPages > 1;
+
+                // 总数显示：真实数字（≤999）或 999+
+                const countStr = totalCount > 999 ? '999+' : String(totalCount);
+
+                safeHeader.className = 'w-full flex items-center gap-2 bg-black/50 backdrop-blur-sm border-b border-gray-800/50 px-3 pb-3';
+                safeHeader.style.paddingTop = 'max(8px, env(safe-area-inset-top, 8px))';
+
+                // 全局统一布局： [媒体库名] [count ✨] (若有多页则右侧添加 [❮ x/n ❯])
+                safeHeader.innerHTML = `
+                    <span class="text-sm font-bold text-gray-200">${libraryName}</span>
+                    <span class="text-xs text-primary/70 tabular-nums flex items-center">
+                        ${countStr}
+                        <span class="w-1.5"></span>
+                        <button id="gridShuffleBtn" title="随机换一批" class="active:scale-90 transition-transform p-[2px] bg-white/10 rounded-full hover:bg-white/20">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-white"></i>
+                        </button>
+                    </span>
+                    <span class="flex-1"></span>
+                    ${showPager ? `
+                        <button id="gridPrevBtn" class="px-1.5 py-0.5 rounded text-xs ${currentPage <= 1 ? 'text-gray-600 pointer-events-none' : 'text-gray-300 active:scale-90 hover:text-white transition-colors'}">❮</button>
+                        <span class="text-xs text-gray-400 tabular-nums">${currentPage}<span class="text-gray-600">/</span>${totalPages}</span>
+                        <button id="gridNextBtn" class="px-1.5 py-0.5 rounded text-xs ${currentPage >= totalPages ? 'text-gray-600 pointer-events-none' : 'text-gray-300 active:scale-90 hover:text-white transition-colors'}">❯</button>
+                    ` : ''}
+                `;
+                container.appendChild(safeHeader);
+
+                // 换一批按钮：所有模式都有，随机获取 99 个
+                const shuffleBtn = document.getElementById('gridShuffleBtn');
+                if (shuffleBtn) {
+                    const curLibId = this.state.currentLibraryId;
+                    const libArg = (!curLibId || curLibId === 'favorites') ? null : curLibId;
+                    shuffleBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.state.startIndex = 0;
+                        this.fetchVideos(libArg, null, false, true); // isRandom=true
+                    };
+                }
+
+                // 分页按钮：仅指定媒体库且多页时显示
+                if (showPager) {
+                    const curLibId = this.state.currentLibraryId;
+                    const libArg = curLibId === 'favorites' ? null : curLibId;
+
+                    const prevBtn = document.getElementById('gridPrevBtn');
+                    if (prevBtn && currentPage > 1) {
+                        prevBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            this.state.startIndex = Math.max(0, startIndex - PAGE_SIZE);
+                            this.fetchVideos(libArg, null, true, false);
+                        };
+                    }
+                    const nextBtn = document.getElementById('gridNextBtn');
+                    if (nextBtn && currentPage < totalPages) {
+                        nextBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            this.state.startIndex = startIndex + PAGE_SIZE;
+                            this.fetchVideos(libArg, null, true, false);
+                        };
+                    }
+                }
+
+                // 创建专门的内部滚动容器
+                const scrollArea = document.createElement('div');
+                scrollArea.className = 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative w-full overscroll-contain';
+                scrollArea.style.WebkitOverflowScrolling = 'touch';
+                container.appendChild(scrollArea);
+
+                // MOUSE DRAG SUPPORT FOR GRID
+                let isDown = false;
+                let startY;
+                let scrollTop;
+                scrollArea.addEventListener('mousedown', (e) => {
+                    isDown = true;
+                    scrollArea.style.cursor = 'grabbing';
+                    startY = e.pageY - scrollArea.offsetTop;
+                    scrollTop = scrollArea.scrollTop;
+                });
+                scrollArea.addEventListener('mouseleave', () => {
+                    isDown = false;
+                    scrollArea.style.cursor = '';
+                });
+                scrollArea.addEventListener('mouseup', () => {
+                    isDown = false;
+                    scrollArea.style.cursor = '';
+                });
+                scrollArea.addEventListener('mousemove', (e) => {
+                    if (!isDown) return;
+                    e.preventDefault();
+                    const y = e.pageY - scrollArea.offsetTop;
+                    const walk = (y - startY) * 2;
+                    scrollArea.scrollTop = scrollTop - walk;
+                });
+
+                gridWrapper.className = 'grid grid-cols-3 gap-1 content-start w-full relative z-10 px-1 pt-2';
+                scrollArea.appendChild(gridWrapper);
+
+                this.state.videos.forEach((video, index) => {
+                    const el = document.createElement('div');
+                    const isActive = index === this.state.currentIndex;
+                    el.setAttribute('tabindex', '0');
+                    el.setAttribute('data-index', index);
+                    el.className = `focusable-item aspect-[3/4] relative cursor-pointer overflow-hidden rounded-sm active:scale-95 transition-transform ${isActive ? 'border-2 border-primary box-border' : 'bg-gray-800'}`;
+                    el.onclick = () => {
+                        this.state.currentIndex = index;
+                        this.toggleViewMode();
+                    };
+
+                    const img = document.createElement('img');
+                    img.crossOrigin = 'anonymous';
+                    img.referrerPolicy = 'no-referrer';
+                    img.src = this.getImageSrc(video);
+                    img.className = 'w-full h-full object-cover';
+                    img.loading = 'lazy';
+                    img.onerror = () => {
+                        img.onerror = null;
+                        // poster.webp 也不存在时，用内联 SVG 兜底，避免显示破损图标
+                        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"%3E%3Crect width="1" height="1" fill="%23333"%2F%3E%3C%2Fsvg%3E';
+                    };
+                    el.appendChild(img);
+
+                    if (video.RunTimeTicks) {
+                        const duration = Math.floor(video.RunTimeTicks / 10000000);
+                        const mins = Math.floor(duration / 60);
+                        const secs = duration % 60;
+                        const timeBadge = document.createElement('div');
+                        timeBadge.className = 'absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 py-0.5 rounded';
+                        timeBadge.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                        el.appendChild(timeBadge);
+                    }
+
+                    gridWrapper.appendChild(el);
+                });
+
+                // --- 彩蛋尾部文案：一言 API ---
+                // 修改说明：
+                //   基础 URL: https://v1.hitokoto.cn/
+                //   常用参数: ?c=a (动画) | ?c=b (漫画) | ?c=d (文学) | ?c=i (诗词)
+                //   不传参数则随机全类型
+                //   如不需要彩蛋，移除下方代码块即可
+                const eggFooter = document.createElement('div');
+                eggFooter.className = 'col-span-3 pt-8 pb-24 px-4 text-center text-gray-600 text-[11px] leading-relaxed select-none';
+                eggFooter.innerHTML = '<span class="opacity-40">——</span>';
+                gridWrapper.appendChild(eggFooter);
+
+                // 异步获取一言并填入尾部
+                fetch('https://v1.hitokoto.cn/?encode=json&charset=utf-8')
+                    .then(r => r.json())
+                    .then(data => {
+                        const text = data.hitokoto || '';
+                        // from_who 为作者，from 为来源作品
+                        const source = [data.from_who, data.from].filter(Boolean).join(' · ');
+                        eggFooter.innerHTML = `
+                            <p class="text-gray-300">“${text}”</p>
+                            ${source ? `<p class="mt-1 text-gray-500 italic">- ${source} -</p>` : ''}
+                        `;
+                    })
+                    .catch(() => {
+                        // 网络失败就静默不显示
+                        eggFooter.innerHTML = '';
+                    });
+
+
+                // 定位到当前高亮元素
+                const focusVideo = this.state.videos[this.state.currentIndex];
+                if (focusVideo) {
+                    this.dom.videoTitle.textContent = focusVideo.Name || '未知视频';
+                    this.dom.videoDescription.textContent = focusVideo.Overview || '没有简介...';
+                }
+
+                // 滚动到当前高亮的卡片
+                requestAnimationFrame(() => {
+                    const activeEl = gridWrapper.children[this.state.currentIndex];
+                    if (activeEl) activeEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+                });
+
+                lucide.createIcons();
+            }
+
+            // 缓冲渲染逻辑
+            renderBuffer() {
+                if (this.state.viewMode !== 'stream' || !this.dom.slides) return;
+
+                this.dom.videoContainer.style.transform = `translateY(-${this.state.currentIndex * 100}%)`;
+
+                const offsets = [-1, 0, 1];
+                offsets.forEach((offset) => {
+                    const videoIdx = this.state.currentIndex + offset;
+                    if (videoIdx < 0 || videoIdx >= this.state.videos.length) return;
+
+                    const slideIdx = (videoIdx % 3 + 3) % 3;
+                    const slideEl = this.dom.slides[slideIdx];
+                    const videoData = this.state.videos[videoIdx];
+
+                    slideEl.style.transform = `translateY(${videoIdx * 100}%)`;
+                    slideEl.style.display = 'block';
+
+                    if (slideEl.dataset.id !== videoData.Id) {
+                        slideEl.dataset.id = videoData.Id;
+                        const posterSrc = this.getImageSrc(videoData);
+
+                        // 《修复点②》 封面图层：直接赋値，密集型封面直接服务于动画过度
+                        const thumbEl = document.getElementById(`thumb-${slideIdx}`);
+                        if (thumbEl) {
+                            thumbEl.src = posterSrc;
+                            thumbEl.onerror = () => { thumbEl.src = this.getImageSrc(null); };
+                        }
+
+                        // 模糊背景（contain 模式下用）
+                        const posterEl = document.getElementById(`poster-${slideIdx}`);
+                        if (posterEl) posterEl.style.backgroundImage = `url('${posterSrc}')`;
+
+                        // 《修复点①》 视频重置为透明（封面图作为占位）
+                        const videoEl = document.getElementById(`video-p${slideIdx}`);
+                        videoEl.style.opacity = '0';
+                        videoEl.onerror = null;
+
+                        // 《修复点④》 预加载相邻视频：将实际播放地址赋给相邻 slot
+                        const preloadSrc = this.getVideoSrc(videoData.Id, videoData);
+                        if (videoEl.src !== preloadSrc) {
+                            videoEl.src = preloadSrc;
+                            videoEl.load();
+                        }
+
+                        // 【关键修复】防止声音重叠：
+                        // 预加载的视频（offset != 0）必须强制静音，
+                        // 只有当前视频（offset == 0）遵循全局静音状态。
+                        videoEl.muted = (offset === 0) ? this.state.isMuted : true;
+
+                        document.getElementById(`playBtn-${slideIdx}`).classList.remove('paused');
+                    }
+                });
+
+                // 隐藏范围外的卡片（只清空 src，不调 load()）
+                for (let i = 0; i < 3; i++) {
+                    const activeIndices = offsets.map(o => (this.state.currentIndex + o));
+                    const currentSlideVideoIdx = activeIndices.find(idx => ((idx % 3 + 3) % 3) === i);
+                    if (currentSlideVideoIdx === undefined || currentSlideVideoIdx < 0 || currentSlideVideoIdx >= this.state.videos.length) {
+                        this.dom.slides[i].style.display = 'none';
+                        this.dom.slides[i].dataset.id = '';
+                        const videoEl = document.getElementById(`video-p${i}`);
+                        if (videoEl) {
+                            videoEl.onerror = null;
+                            videoEl.style.opacity = '0';
+                            videoEl.removeAttribute('src');
+                        }
+                    }
+                }
+                this.updateUI();
+            }
+
+            loadVideo(index) {
+                if (this.state.viewMode !== 'stream') return;
+
+                this.renderBuffer(); // 确保 DOM 就位
+
+                const videoData = this.state.videos[this.state.currentIndex];
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                const videoEl = document.getElementById(`video-p${slideIdx}`);
+
+                if (!videoEl || !videoData) return;
+
+                // renderBuffer 已赋值 src，处理未匹配时的修正
+                const src = this.getVideoSrc(videoData.Id, videoData);
+                if (videoEl.src !== src) {
+                    videoEl.src = src;
+                    videoEl.load();
+                }
+
+                // 同步全局静音状态（精准更新 SVG）
+                videoEl.muted = this.state.isMuted;
+                const muteIcon = this.dom.muteBtn.querySelector('svg');
+                if (muteIcon) {
+                    const iconName = this.state.isMuted ? 'volume-x' : 'volume-2';
+                    const iconColor = this.state.isMuted ? 'text-secondary' : 'stroke-white';
+                    this.dom.muteBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${iconName}" class="${iconColor} w-6 h-6 drop-shadow-md"></i></div>`;
+                    lucide.createIcons({ nameAttr: 'data-lucide', attrs: {}, nodes: [this.dom.muteBtn] });
+                }
+
+                // 《修复点③》 加载圈延迟 300ms：局域网正常情况下用户完全不会看到加载圈
+                videoEl.onwaiting = () => {
+                    clearTimeout(this._waitingTimer);
+                    this._waitingTimer = setTimeout(() => this.toggleLoading(true), 300);
+                };
+                videoEl.onplaying = () => {
+                    clearTimeout(this._waitingTimer);
+                    this.toggleLoading(false);
+                    // 确保播放时图层可见，应对部分系统/浏览器事件次序差异
+                    videoEl.style.opacity = '1';
+                };
+
+                // 《修复点①》 canplay 时视频淡入覆盖封面
+                videoEl.oncanplay = () => {
+                    clearTimeout(this._waitingTimer);
+                    this.toggleLoading(false);
+                    videoEl.style.opacity = '1';
+                };
+
+                // 处理预加载已经就绪的情况（readyState >= 3 表示已可播放）
+                if (videoEl.readyState >= 3) {
+                    clearTimeout(this._waitingTimer);
+                    this.toggleLoading(false);
+                    videoEl.style.opacity = '1';
+                }
+
+                videoEl.ontimeupdate = () => {
+                    if (videoEl.duration) {
+                        const pct = (videoEl.currentTime / videoEl.duration) * 100;
+                        this.dom.progressLine.style.width = `${pct}%`;
+                        this.dom.currentTime.textContent = this.formatTime(videoEl.currentTime);
+                        this.dom.totalTime.textContent = this.formatTime(videoEl.duration);
+                    }
+                };
+
+                videoEl.onended = () => {
+                    if (this.state.viewMode === 'stream' && this.state.isAutoplay) {
+                        this.nextVideo();
+                    }
+                };
+
+                videoEl.onerror = () => {
+                    console.warn('视频播放失败，处理降级重试逻辑');
+                    this.toggleLoading(false);
+                    this.retryWithAltMode(this.state.currentIndex, videoData);
+                };
+
+                videoEl.dataset.retryCount = '0';
+            }
+
+            playVideo(index) {
+                if (this.state.viewMode !== 'stream') return;
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+
+                // Safari & Edge Autoplay Policy Bypass (解锁视频池)
+                if (!window._videosUnlocked) {
+                    const unlock = () => {
+                        window._videosUnlocked = true;
+                        [0, 1, 2].forEach(i => {
+                            const vi = document.getElementById(`video-p${i}`);
+                            if (vi && i !== slideIdx) {
+                                // 快速播放并暂停，获取浏览器授权令牌
+                                const p = vi.play();
+                                if (p !== undefined) p.then(() => vi.pause()).catch(() => { });
+                            }
+                        });
+                        document.removeEventListener('touchstart', unlock, true);
+                        document.removeEventListener('click', unlock, true);
+                    };
+                    document.addEventListener('touchstart', unlock, { once: true, capture: true });
+                    document.addEventListener('click', unlock, { once: true, capture: true });
+                }
+
+                // 停止非当前视频
+                [0, 1, 2].forEach(i => {
+                    const vi = document.getElementById(`video-p${i}`);
+                    if (vi && i !== slideIdx) {
+                        vi.pause();
+                        vi.currentTime = 0;
+                        // 优化：切换视频时，旧视频只需静默停止，不要显示暂停按钮，防止闪烁穿帮
+                        const btn = document.getElementById(`playBtn-${i}`);
+                        if (btn) btn.classList.remove('paused');
+                    }
+                });
+
+                const v = document.getElementById(`video-p${slideIdx}`);
+                const btn = document.getElementById(`playBtn-${slideIdx}`);
+                if (v) {
+                    if (!this.state.isMuted) v.muted = false;
+                    const playPromise = v.play();
+
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            this.state.isPlaying = true;
+                            if (btn) btn.classList.remove('paused');
+                        }).catch(error => {
+                            console.warn('播放被阻止(可能缺失交互):', error);
+                            this.state.isPlaying = false;
+                            this.toggleLoading(false);
+                            if (btn) btn.classList.add('paused');
+
+                            // 降级：如果被浏览器强行阻止，弹出UI引导用户点击
+                            if (error.name === 'NotAllowedError') {
+                                this.showToast('浏览器限制自动播放，请点击屏幕开始');
+                                const app = document.getElementById('app');
+                                if (app.classList.contains('interface-hidden')) {
+                                    app.classList.remove('interface-hidden');
+                                    this.showInterfaceTemp();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            retryWithAltMode(index, item) {
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                const v = document.getElementById(`video-p${slideIdx}`);
+                if (!v) return;
+
+                const retryCount = parseInt(v.dataset.retryCount || '0');
+
+                if (this.config.useStatic) {
+                    // 报错时立即请求文件详情获取库容器编码
+                    const doShow = (fmt) => this.showToast(`原生播放器不支持此编码 (${fmt ? fmt.toUpperCase() : '未知'})`);
+                    const { server, token, userId } = this.config;
+                    fetch(`${server}/emby/Users/${userId}/Items/${item.Id}?api_key=${token}&Fields=MediaSources`)
+                        .then(r => r.json())
+                        .then(d => {
+                            const src = d.MediaSources?.[0];
+                            const vStream = src?.MediaStreams?.find(s => s.Type === 'Video');
+                            const codec = vStream?.Codec || src?.Container || '';
+                            doShow(codec);
+                        })
+                        .catch(() => doShow(''));
+                    return;
+                }
+
+                // 如果取消了"直接播放"（允许转码），进行1次重试，使用转码流
+                if (retryCount >= 1) {
+                    this.showToast('转码播放失败，请检查 Emby 设置');
+                    return;
+                }
+
+                v.dataset.retryCount = String(retryCount + 1);
+                const { server, token } = this.config;
+                // 转码模式 Container=mp4
+                v.src = `${server}/emby/Videos/${item.Id}/stream?api_key=${token}&Container=mp4`;
+                v.load();
+                this.playVideo(index);
+                this.showToast('尝试转码播放中...');
+            }
+
+            togglePlay() {
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                const v = document.getElementById(`video-p${slideIdx}`);
+                const btn = document.getElementById(`playBtn-${slideIdx}`);
+                if (!v) return;
+
+                if (v.paused) {
+                    v.play();
+                    this.state.isPlaying = true;
+                    if (btn) btn.classList.remove('paused');
+                } else {
+                    v.pause();
+                    this.state.isPlaying = false;
+                    if (btn) btn.classList.add('paused');
+                }
+            }
+
+
+
+            prevVideo() {
+                if (this.state.currentIndex === 0) {
+                    return;
+                }
+                this.switchSlide(this.state.currentIndex - 1, 'down');
+            }
+
+            switchSlide(newIndex, direction) {
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                const curV = document.getElementById(`video-p${slideIdx}`);
+                if (curV) curV.pause();
+
+                // 【动画修复】先同步预就位目标 slide，再同步触发 container 位移动画
+                // 这样浏览器能在同一帧内确认 slide 位置，动画由 GPU 合成层完成，不会闪现
+                if (this.dom.slides) {
+                    const destSlideIdx = (newIndex % 3 + 3) % 3;
+                    const destSlide = this.dom.slides[destSlideIdx];
+                    if (destSlide) {
+                        // 预就位：让 slide 在动画帧前就已经在正确位置
+                        destSlide.style.transform = `translateY(${newIndex * 100}%)`;
+                        destSlide.style.display = 'block';
+                    }
+                }
+
+                this.state.currentIndex = newIndex;
+
+                // 立即触发 CSS 过渡动画（container 位移）——不等 rAF
+                if (this.dom.videoContainer) {
+                    this.dom.videoContainer.style.transform = `translateY(-${newIndex * 100}%)`;
+                }
+
+                // 视频加载（重操作）推到下一帧，不阻塞动画首帧渲染
+                requestAnimationFrame(() => {
+                    this.loadVideo(newIndex);
+                    this.playVideo(newIndex);
+                });
+            }
+
+            // --- 辅助功能 ---
+
+            getVideoSrc(id, mediaItem) {
+                const { server, token, useStatic } = this.config;
+
+                // 策略 B：取消【直接播放】，全权委托 Emby 服务器自动降级
+                // Direct Play > Direct Stream > Transcode，无需前端干预
+                if (!useStatic) {
+                    return `${server}/emby/Videos/${id}/stream.mp4?api_key=${token}&VideoCodec=h264,hevc,vp9&AudioCodec=aac,mp3`;
+                }
+
+                // 策略 A：勾选【直接播放】，默认原画直连，对 iOS 进行转封装兼容
+                const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+                if (isIOS && mediaItem) {
+                    const mediaSourceId = mediaItem.MediaSources?.[0]?.Id || '';
+                    if (mediaSourceId) {
+                        // iOS专属 HLS 流水线
+                        // 修复：Emby API 强制要求 PlaySessionId，且必须指定 SegmentContainer=mp4 支持 fMP4 HEVC 切片
+                        // 补充了 VideoBitrate 避免 Emby 计算带限报错
+                        const playSessionId = 'ios_hls_' + id + '_' + Date.now();
+                        const hlsProps = [
+                            `api_key=${token}`,
+                            `MediaSourceId=${mediaSourceId}`,
+                            `DeviceId=EmbyX_Web_iOS`,
+                            `PlaySessionId=${playSessionId}`,
+                            `VideoCodec=hevc,h264`,
+                            `AudioCodec=aac,mp3,ac3`,
+                            `VideoBitrate=140000000`,
+                            `AudioBitrate=320000`,
+                            `TranscodingMaxAudioChannels=2`,
+                            `SegmentContainer=mp4,ts`,
+                            `MinSegments=1`,
+                            `BreakOnNonKeyFrames=True`,
+                            `EnableAutoStreamCopy=true`,
+                            `AllowVideoStreamCopy=true`,
+                            `AllowAudioStreamCopy=true`
+                        ].join('&');
+                        return `${server}/emby/Videos/${id}/master.m3u8?${hlsProps}`;
+                    }
+                }
+
+                // 默认：原画直连（安卓全格式 / PC 端 / MediaSources 缺失时兜底）
+                return `${server}/emby/Videos/${id}/stream?api_key=${token}&Static=true`;
+            }
+
+            getImageSrc(video) {
+                const { server, token } = this.config;
+                // 优先加载同目录的定制封面图
+                const fallbackUrl = './poster.webp';
+
+                if (typeof video === 'object' && video !== null) {
+                    if (video.ImageTags && video.ImageTags.Primary) {
+                        return `${server}/emby/Items/${video.Id}/Images/Primary?api_key=${token}`;
+                    }
+                    return fallbackUrl;
+                }
+
+                // 此时传入的是纯 ID 字符串（旧逻辑残留处理）
+                if (!video) return fallbackUrl;
+                return `${server}/emby/Items/${video}/Images/Primary?api_key=${token}`;
+            }
+
+            async showLibraries() {
+                this.toggleLoading(true);
+                const list = document.getElementById('librariesList');
+                list.innerHTML = '';
+
+                try {
+                    const userId = this.config.userId;
+
+                    const playlistsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Items?Recursive=true&IncludeItemTypes=Playlist&api_key=${this.config.token}`);
+                    const playlistsData = await playlistsRes.json();
+
+                    const viewsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Views?api_key=${this.config.token}`);
+                    const viewsDataRaw = viewsRes.ok ? await viewsRes.json() : { Items: [] };
+
+                    // 缓存完整的视图和列表数据供网格模式提取名称
+                    localStorage.setItem('emby_views_cache', JSON.stringify({ playlists: playlistsData, views: viewsDataRaw }));
+
+                    // 过滤掉基于特定收集方式的视图避免重叠
+                    const filteredViews = viewsDataRaw.Items ? viewsDataRaw.Items.filter(item => item.CollectionType !== 'playlists' && item.CollectionType !== 'boxsets') : [];
+
+                    const favDiv = document.createElement('div');
+                    const isFavSelected = this.state.currentLibraryId === 'favorites';
+                    favDiv.setAttribute('tabindex', '0');
+                    favDiv.className = `focusable-item col-span-1 p-2.5 rounded cursor-pointer text-sm flex items-center gap-2 ${isFavSelected ? 'bg-primary/20 text-primary font-bold border border-primary/50' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`;
+                    favDiv.innerHTML = `<i data-lucide="folder-heart" class="w-4 h-4"></i><span class="flex-1 truncate">收藏夹</span>${isFavSelected ? '<i data-lucide="check" class="w-3.5 h-3.5"></i>' : ''}`;
+                    favDiv.onclick = () => {
+                        this.state.currentLibraryId = 'favorites';
+                        this.state.currentTab = 'favorites';
+                        if (this.state.favorites.size === 0) {
+                            this.showToast('暂无收藏');
+                            return;
+                        }
+                        this.state.currentLibraryType = 'favorites';
+                        this.fetchVideos();
+                        this.toggleModal('libraryModal', false);
+                    };
+                    list.appendChild(favDiv);
+
+                    if (playlistsData && playlistsData.Items && playlistsData.Items.length > 0) {
+                        const headerPl = document.createElement('div');
+                        headerPl.className = 'col-span-2 text-xs text-gray-500 mt-2 mb-1 pl-1';
+                        headerPl.textContent = '播放列表';
+                        list.appendChild(headerPl);
+
+                        playlistsData.Items.forEach(pl => {
+                            const div = document.createElement('div');
+                            const isSelected = pl.Id === this.state.currentLibraryId;
+                            div.setAttribute('tabindex', '0');
+                            div.className = `focusable-item col-span-1 p-2.5 rounded cursor-pointer text-sm flex items-center gap-2 ${isSelected ? 'bg-primary/20 text-primary font-bold border border-primary/50' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`;
+                            div.innerHTML = `<i data-lucide="list-video" class="w-4 h-4 flex-shrink-0"></i><span class="flex-1 truncate">${pl.Name}</span>${isSelected ? '<i data-lucide="check" class="w-3.5 h-3.5 flex-shrink-0"></i>' : ''}`;
+                            div.onclick = () => {
+                                this.state.currentLibraryId = pl.Id;
+                                this.state.currentLibraryType = 'playlist';
+                                this.state.currentTab = 'home';
+                                this.updateTabHighlight();
+                                this.fetchVideos(pl.Id);
+                                this.toggleModal('libraryModal', false);
+                            };
+                            list.appendChild(div);
+                        });
+                    }
+
+                    if (filteredViews && filteredViews.length > 0) {
+                        const headerLib = document.createElement('div');
+                        headerLib.className = 'col-span-2 text-xs text-gray-500 mt-2 mb-1 pl-1';
+                        headerLib.textContent = '媒体库';
+                        list.appendChild(headerLib);
+
+                        filteredViews.forEach(lib => {
+                            const div = document.createElement('div');
+                            const isSelected = lib.Id === this.state.currentLibraryId;
+                            div.setAttribute('tabindex', '0');
+                            div.className = `focusable-item col-span-1 p-2.5 rounded cursor-pointer text-sm flex items-center gap-2 ${isSelected ? 'bg-primary/20 text-primary font-bold border border-primary/50' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`;
+                            div.innerHTML = `<i data-lucide="film" class="w-4 h-4 flex-shrink-0"></i><span class="flex-1 truncate">${lib.Name}</span>${isSelected ? '<i data-lucide="check" class="w-3.5 h-3.5 flex-shrink-0"></i>' : ''}`;
+                            div.onclick = () => {
+                                this.state.currentLibraryId = lib.Id;
+                                this.state.currentLibraryType = 'library';
+                                this.state.currentTab = 'home';
+                                this.updateTabHighlight();
+                                this.fetchVideos(lib.Id);
+                                this.toggleModal('libraryModal', false);
+                            };
+                            list.appendChild(div);
+                        });
+                    }
+
+                    lucide.createIcons();
+                    this.toggleModal('libraryModal', true);
+
+                } catch (e) {
+                    console.error('获取媒体库失败:', e);
+                    this.showToast('获取媒体库失败');
+
+                    const favDiv = document.createElement('div');
+                    favDiv.className = 'p-3 rounded mb-2 cursor-pointer text-sm flex items-center gap-3 bg-gray-800 text-white';
+                    favDiv.innerHTML = `<i data-lucide="folder-heart" class="w-5 h-5"></i><span class="flex-1">收藏夹</span>`;
+                    favDiv.onclick = () => {
+                        if (this.state.favorites.size === 0) {
+                            this.showToast('暂无收藏');
+                            return;
+                        }
+                        this.state.currentLibraryId = 'favorites';
+                        this.state.currentLibraryType = 'favorites';
+                        this.fetchVideos();
+                        this.toggleModal('libraryModal', false);
+                    };
+                    list.appendChild(favDiv);
+
+                    lucide.createIcons();
+                    this.toggleModal('libraryModal', true);
+                } finally {
+                    this.toggleLoading(false);
+                }
+            }
+
+            async toggleFavorite() {
+                const item = this.state.videos[this.state.currentIndex];
+                if (!item) return;
+                const id = String(item.Id);
+                // 以 Emby API 的 UserData.IsFavorite 为单一数据源
+                if (!item.UserData) item.UserData = {};
+                const isFav = item.UserData.IsFavorite === true;
+                const { server, token, userId } = this.config;
+
+                // 乐观更新：先修改内存和 UI
+                item.UserData.IsFavorite = !isFav;
+                if (!isFav) {
+                    this.state.favorites.add(id);
+                    this.showToast('❤️ 已收藏');
+                } else {
+                    this.state.favorites.delete(id);
+                    this.showToast('取消收藏');
+                }
+                this.updateUI();
+
+                // 远端同步 Emby API
+                if (server && token && userId) {
+                    try {
+                        const method = isFav ? 'DELETE' : 'POST';
+                        const res = await fetch(`${server}/emby/Users/${userId}/FavoriteItems/${id}?api_key=${token}`, { method });
+                        if (!res.ok) {
+                            // 远端失败，回滚内存状态
+                            item.UserData.IsFavorite = isFav;
+                            if (isFav) this.state.favorites.add(id); else this.state.favorites.delete(id);
+                            this.updateUI();
+                            this.showToast('操作失败，请重试');
+                        }
+                    } catch (e) {
+                        console.error('收藏同步失败:', e);
+                    }
+                }
+            }
+
+            // --- UI 更新与交互 ---
+
+            updateUI() {
+                const item = this.state.videos[this.state.currentIndex];
+                if (item) {
+                    this.dom.videoTitle.textContent = item.Name;
+                    this.dom.videoDescription.textContent = item.Overview || '暂无简介';
+
+                    const favBtn = document.getElementById('favoriteBtn');
+                    // 以 Emby API 返回的 UserData.IsFavorite 为单一数据源
+                    const isFav = item.UserData?.IsFavorite === true;
+                    favBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${isFav ? 'folder-heart' : 'heart'}" class="${isFav ? 'text-secondary' : 'stroke-white'} w-6 h-6 drop-shadow-md"></i></div>`;
+                    // 定向更新：只扫描 favBtn 内部，不全局扫描 DOM
+                    lucide.createIcons({ nameAttr: 'data-lucide', nodes: [favBtn] });
+                }
+            }
+
+            updateTabHighlight() {
+                [this.dom.myBtn, this.dom.libraryBtn, this.dom.playModeBtn, this.dom.viewModeBtn].forEach(btn => {
+                    if (btn) {
+                        btn.classList.add('text-gray-400');
+                        btn.classList.remove('text-white');
+                    }
+                });
+            }
+
+            toggleAutoplay() {
+                const app = document.getElementById('app');
+                if (app.classList.contains('interface-hidden')) {
+                    app.classList.remove('interface-hidden');
+                } else {
+                    app.classList.add('interface-hidden');
+                }
+            }
+
+            toggleDeleteMode() {
+                const item = this.state.videos[this.state.currentIndex];
+                if (!item) return;
+
+                this.dom.deleteFileName.textContent = '确认删除 ' + (item.Name || '此视频') + ' 吗？';
+                this.toggleModal('deleteConfirmModal', true);
+                lucide.createIcons();
+            }
+
+            executeDelete() {
+                const item = this.state.videos[this.state.currentIndex];
+                if (!item) return;
+
+                fetch(`${this.config.server}/emby/Items/${item.Id}?api_key=${this.config.token}`, {
+                    method: 'DELETE'
+                }).then(() => {
+                    this.showToast('✅ 已删除');
+                    this.state.videos.splice(this.state.currentIndex, 1);
+                    this.toggleModal('deleteConfirmModal', false);
+                    if (this.state.viewMode === 'grid') {
+                        this.renderGridView();
+                    } else {
+                        // 如果删的是最后一个，回到上一个
+                        if (this.state.currentIndex >= this.state.videos.length) {
+                            this.state.currentIndex = Math.max(0, this.state.videos.length - 1);
+                        }
+                        this.renderSlides();
+                    }
+                }).catch(() => {
+                    this.showToast('❌ 删除失败');
+                    this.toggleModal('deleteConfirmModal', false);
+                });
+            }
+
+            showInterfaceTemp() {
+                const app = document.getElementById('app');
+                if (this.csTimer) clearTimeout(this.csTimer);
+
+                // 只有在流模式且处于全屏状态，且界面当前处于显示状态，
+                // 且当前没有任何弹窗遮罩时，才开启自动隐藏计时。
+                if (this.state.viewMode === 'grid') return;
+                if (this.isAnyModalOpen()) return;
+
+                if ((document.fullscreenElement || app.classList.contains('ios-pwa-fullscreen')) && !app.classList.contains('interface-hidden')) {
+                    // 全局自动清屏倒计时：默认五秒 (5000ms)
+                    // 注释：如果你想修改清屏等待时长，请修改下方的 5000 数值
+                    this.csTimer = setTimeout(() => {
+                        app.classList.add('interface-hidden');
+                    }, 5000);
+                }
+            }
+
+            // 随机模式：原地洗牌 videos 数组，保持 currentIndex 不变
+            // 这样 +1 下一个就是随机视频，且三槽预缓冲完全生效
+            _shuffleAroundCurrent() {
+                const idx = this.state.currentIndex;
+                const cur = this.state.videos[idx];
+                // 整体洗牌
+                for (let i = this.state.videos.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.state.videos[i], this.state.videos[j]] = [this.state.videos[j], this.state.videos[i]];
+                }
+                // 将当前视频放回其在数组中的原位置
+                const newPos = this.state.videos.findIndex(v => v.Id === cur.Id);
+                [this.state.videos[newPos], this.state.videos[idx]] = [this.state.videos[idx], this.state.videos[newPos]];
+            }
+
+            togglePlayMode() {
+                const isSeq = this.state.playMode === 'sequence';
+                this.state.playMode = isSeq ? 'random' : 'sequence';
+
+                const btn = this.dom.playModeBtn;
+                btn.innerHTML = `<i data-lucide="${isSeq ? 'shuffle' : 'repeat'}" class="stroke-current w-5 h-5"></i>`;
+                lucide.createIcons();
+
+                if (isSeq) {
+                    // 切换随机：保存原始列表，就地洗牌
+                    // currentIndex/物理 slot 不变，当前视频完全不受干扰
+                    this.state.originalVideos = [...this.state.videos];
+                    this._shuffleAroundCurrent();
+                    // 刷新相邻插槽（当前插槽内容不变，两侧插槽更新为随机顺序）
+                    if (this.dom.slides) this.renderBuffer();
+                    this.showToast('🔀 随机播放（下一个）');
+                } else {
+                    // 切回顺序：恢复原始列表，将当前视频对换到 currentIndex 位置
+                    // 确保物理 slot 不变、currentIndex 不变，当前播放零干扰
+                    const curId = this.state.videos[this.state.currentIndex]?.Id;
+                    this.state.videos = [...this.state.originalVideos];
+                    this.state.originalVideos = [];
+                    if (curId) {
+                        const origPos = this.state.videos.findIndex(v => String(v.Id) === String(curId));
+                        if (origPos >= 0 && origPos !== this.state.currentIndex) {
+                            [this.state.videos[origPos], this.state.videos[this.state.currentIndex]] =
+                                [this.state.videos[this.state.currentIndex], this.state.videos[origPos]];
+                        }
+                    }
+                    // 刷新相邻插槽
+                    if (this.dom.slides) this.renderBuffer();
+                    this.showToast('🔁 顺序播放（下一个）');
+                }
+            }
+
+
+            // 删除旧的 _buildShuffledQueue，nextVideo 恢复纯顺序逻辑
+            nextVideo() {
+                const nextIndex = this.state.currentIndex + 1;
+                if (nextIndex >= this.state.videos.length) {
+                    this.showToast('已经是最后一个视频了');
+                    return;
+                }
+                this.switchSlide(nextIndex, 'up');
+            }
+
+            toggleViewMode() {
+                const isStream = this.state.viewMode === 'stream';
+                this.state.viewMode = isStream ? 'grid' : 'stream';
+
+                const btn = this.dom.viewModeBtn;
+                btn.innerHTML = `<i data-lucide="${this.state.viewMode === 'stream' ? 'gallery-vertical' : 'layout-grid'}" class="stroke-current w-5 h-5"></i>`;
+
+                lucide.createIcons();
+
+                if (this.state.viewMode === 'grid') {
+                    const app = document.getElementById('app');
+                    if (app) {
+                        app.classList.remove('interface-hidden');
+                        app.classList.add('grid-active'); // 特殊清屏状态：只留底部栏
+                        if (this.csTimer) clearTimeout(this.csTimer);
+                    }
+                    this.dom.videoContainer.style.touchAction = 'auto';
+                    this.renderGridView();
+                } else {
+                    const app = document.getElementById('app');
+                    if (app) app.classList.remove('grid-active');
+                    this.dom.videoContainer.style.touchAction = 'pan-y';
+                    this.renderSlides();
+                    this.loadVideo(this.state.currentIndex);
+                    this.playVideo(this.state.currentIndex);
+                    // 切回流模式后重新开启自动清屏计时
+                    this.showInterfaceTemp();
+                }
+            }
+
+            toggleScaleMode() {
+                this.state.isScaleFill = !this.state.isScaleFill;
+                const videos = document.querySelectorAll('.video-fullscreen');
+                videos.forEach((v, index) => {
+                    v.classList.remove('object-cover', 'object-contain');
+                    v.classList.add(this.state.isScaleFill ? 'object-cover' : 'object-contain');
+
+                    const thumb = document.getElementById(`thumb-${index}`);
+                    const poster = document.getElementById(`poster-${index}`);
+                    const overlay = document.getElementById(`overlay-${index}`);
+                    if (this.state.isScaleFill) {
+                        // cover 模式：显示封面缩略图，隐藏模糊背景
+                        if (thumb) thumb.style.opacity = '1';
+                        if (poster) poster.style.opacity = '0';
+                        if (overlay) overlay.style.opacity = '0';
+                    } else {
+                        // contain 模式：隐藏封面缩略图，显示模糊背景
+                        if (thumb) thumb.style.opacity = '0';
+                        if (poster) poster.style.opacity = '0.7';
+                        if (overlay) overlay.style.opacity = '1';
+                    }
+                });
+
+                const scaleBtn = this.dom.scaleBtn;
+                scaleBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${this.state.isScaleFill ? 'maximize-2' : 'minimize-2'}" class="stroke-white w-6 h-6 drop-shadow-md"></i></div>`;
+                lucide.createIcons();
+            }
+
+
+            async showMediaInfo() {
+                const item = this.state.videos[this.state.currentIndex];
+                if (!item) return;
+
+                this.dom.mediaInfoModal.classList.remove('hidden');
+                // 打开详情面板也是交互，且属于遮罩状态，需重置/停止计时
+                this.showInterfaceTemp();
+                this.dom.mediaInfoContent.innerHTML = `<div class="flex justify-center py-4"><i data-lucide="loader-2" class="w-6 h-6 animate-spin text-gray-500"></i></div>`;
+                lucide.createIcons();
+
+                try {
+                    const res = await fetch(`${this.config.server}/emby/Users/${this.config.userId}/Items/${item.Id}?api_key=${this.config.token}&Fields=MediaSources`);
+                    if (!res.ok) throw new Error('API Error');
+                    const data = await res.json();
+
+                    if (data && data.MediaSources && data.MediaSources.length > 0) {
+                        const src = data.MediaSources[0];
+                        const c = src.Container || '未知';
+                        const vStream = src.MediaStreams?.find(s => s.Type === 'Video');
+                        const w = vStream?.Width || '?';
+                        const h = vStream?.Height || '?';
+                        const fps = vStream?.AverageFrameRate ? Math.round(parseFloat(vStream.AverageFrameRate)) : '?';
+                        const vCodec = vStream?.Codec || '未知';
+                        const aCodec = src.MediaStreams?.find(s => s.Type === 'Audio')?.Codec || '未知';
+                        const bitrate = src.Bitrate ? (src.Bitrate / 1000000).toFixed(2) + ' Mbps' : '未知';
+                        const fileSizeStr = src.Size ? (src.Size > 1024 * 1024 * 1024 ? (src.Size / (1024 * 1024 * 1024)).toFixed(1) + ' GB' : (src.Size / (1024 * 1024)).toFixed(1) + ' MB') : '未知';
+                        const transcodeState = this.config.useStatic ? '直接播放' : '自动转码';
+
+                        // 布局说明：py-2 控制行高（间距），items-center 确保文字垂直居中
+                        this.dom.mediaInfoContent.innerHTML = `
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">分辨率</span>
+                                <span class="col-span-2 text-gray-200 font-mono">${w}x${h}@${fps}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">封装格式</span>
+                                <span class="col-span-2 text-gray-200">${c.toUpperCase()}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">视频编码</span>
+                                <span class="col-span-2 text-gray-200 font-mono">${vCodec.toUpperCase()}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">音频编码</span>
+                                <span class="col-span-2 text-gray-200 font-mono">${aCodec.toUpperCase()}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">总码率</span>
+                                <span class="col-span-2 text-gray-200 font-mono">${bitrate}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center border-b border-gray-700/50">
+                                <span class="text-gray-500 text-right">文件体积</span>
+                                <span class="col-span-2 text-gray-200 font-mono">${fileSizeStr}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 py-2 items-center">
+                                <span class="text-gray-500 text-right">播放策略</span>
+                                <span class="col-span-2 text-gray-200">${transcodeState}</span>
+                            </div>
+                        `;
+                    } else {
+                        this.dom.mediaInfoContent.innerHTML = `<div class="text-center text-red-400 py-4">无法获取媒体信息</div>`;
+                    }
+                } catch (e) {
+                    this.dom.mediaInfoContent.innerHTML = `<div class="text-center text-red-400 py-4">获取数据失败</div>`;
+                }
+            }
+
+            // --- 事件绑定 ---
+            bindEvents() {
+                this.dom.clickToPlayOverlay.onclick = () => {
+                    this.dom.clickToPlayOverlay.style.display = 'none';
+                    this.playVideo(this.state.currentIndex);
+                };
+
+                this.dom.favoriteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleFavorite();
+                    const favBtn = document.getElementById('favoriteBtn');
+                    const isFav = this.state.favorites.has(String(this.state.videos[this.state.currentIndex]?.Id));
+                    favBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${isFav ? 'folder-heart' : 'heart'}" class="${isFav ? 'text-secondary' : 'stroke-white'} w-6 h-6 drop-shadow-md"></i></div>`;
+                    lucide.createIcons();
+                    this.showInterfaceTemp();
+                };
+
+                this.dom.scaleBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleScaleMode();
+                    this.showInterfaceTemp();
+                };
+
+                this.dom.videoInfoArea.onclick = (e) => {
+                    e.stopPropagation();
+                    const app = document.getElementById('app');
+                    // 清屏状态或格子视图均不触发流媒体详情
+                    if (app.classList.contains('interface-hidden') || app.classList.contains('grid-active')) return;
+                    this.showMediaInfo();
+                };
+
+                this.dom.closeMediaInfoBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.dom.mediaInfoModal.classList.add('hidden');
+                    this.showInterfaceTemp();
+                };
+
+                this.dom.mediaInfoModal.onclick = (e) => {
+                    if (e.target === e.currentTarget) {
+                        this.dom.mediaInfoModal.classList.add('hidden');
+                        this.showInterfaceTemp();
+                    }
+                };
+
+                this.dom.rightToolbar.addEventListener('click', (e) => {
+                    const app = document.getElementById('app');
+                    if (app.classList.contains('interface-hidden')) {
+                        app.classList.remove('interface-hidden');
+                        this.showInterfaceTemp();
+                    }
+                });
+
+                this.dom.muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.state.isMuted = !this.state.isMuted;
+
+                    const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                    const v = document.getElementById(`video-p${slideIdx}`);
+                    if (v) {
+                        v.muted = this.state.isMuted;
+                    }
+
+                    const muteBtn = this.dom.muteBtn;
+                    muteBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${this.state.isMuted ? 'volume-x' : 'volume-2'}" class="${this.state.isMuted ? 'text-secondary' : 'stroke-white'} w-6 h-6 drop-shadow-md"></i></div>`;
+                    lucide.createIcons();
+                };
+
+                this.dom.fullscreenBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const app = document.getElementById('app');
+
+                    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+                    // 方案一：向 iOS 妥协，采用“沉浸式融合”伪全屏
+                    // 若在 iOS 且已加主屏幕（PWA），通过手动移除 UI 来模拟系统全屏
+                    if (isIOS && isStandalone) {
+                        if (!app.classList.contains('ios-pwa-fullscreen')) {
+                            app.classList.add('ios-pwa-fullscreen');
+                            this.showInterfaceTemp();
+                            const fullscreenBtn = this.dom.fullscreenBtn;
+                            fullscreenBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center cursor-pointer active:scale-90 transition-transform bg-black/30 rounded-full"><i data-lucide="minimize" class="stroke-white w-5 h-5 drop-shadow-md"></i></div>`;
+                            lucide.createIcons();
+                        } else {
+                            if (app.classList.contains('interface-hidden')) {
+                                app.classList.remove('interface-hidden');
+                                this.showInterfaceTemp();
+                            } else {
+                                app.classList.remove('ios-pwa-fullscreen');
+                                app.classList.remove('interface-hidden');
+                                if (this.csTimer) clearTimeout(this.csTimer);
+                                const fullscreenBtn = this.dom.fullscreenBtn;
+                                fullscreenBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center cursor-pointer active:scale-90 transition-transform bg-black/30 rounded-full"><i data-lucide="maximize" class="stroke-white w-5 h-5 drop-shadow-md"></i></div>`;
+                                lucide.createIcons();
+                            }
+                        }
+                        return;
+                    }
+
+                    // 正常的 安卓/PC 系统调用原生全屏
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().then(() => {
+                            this.showInterfaceTemp();
+                        }).catch(() => { });
+                    } else {
+                        if (app.classList.contains('interface-hidden')) {
+                            app.classList.remove('interface-hidden');
+                            this.showInterfaceTemp();
+                        } else {
+                            document.exitFullscreen();
+                            app.classList.remove('interface-hidden');
+                        }
+                    }
+                };
+                document.addEventListener('fullscreenchange', () => {
+                    const isFull = !!document.fullscreenElement;
+                    const fullscreenBtn = this.dom.fullscreenBtn;
+                    fullscreenBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center cursor-pointer active:scale-90 transition-transform bg-black/30 rounded-full"><i data-lucide="${isFull ? 'minimize' : 'maximize'}" class="stroke-white w-5 h-5 drop-shadow-md"></i></div>`;
+                    lucide.createIcons();
+
+                    if (!isFull) {
+                        const app = document.getElementById('app');
+                        app.classList.remove('interface-hidden');
+                        if (this.csTimer) clearTimeout(this.csTimer);
+                    }
+                });
+
+                this.dom.deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleDeleteMode();
+                };
+
+                this.dom.viewModeBtn = document.getElementById('viewModeBtn');
+                this.dom.viewModeBtn.onclick = () => this.toggleViewMode();
+                this.dom.playModeBtn.onclick = () => this.togglePlayMode();
+                this.dom.libraryBtn.onclick = () => this.showLibraries();
+                this.dom.myBtn.onclick = () => this.toggleModal('profilePage', true);
+
+                // Material Design 3 液体波纹点击反馈
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        if (this.navTimer) clearTimeout(this.navTimer);
+                        this.classList.remove('nav-clicked');
+                        // 强制重绘，重启CSS动画
+                        void this.offsetWidth;
+                        this.classList.add('nav-clicked');
+
+                        this.navTimer = setTimeout(() => {
+                            this.classList.remove('nav-clicked');
+                        }, 1000); // 1秒后过渡消失
+                    });
+                });
+
+                document.getElementById('closeLibraryBtn').onclick = () => this.toggleModal('libraryModal', false);
+
+                const libraryModal = document.getElementById('libraryModal');
+                libraryModal.onclick = (e) => {
+                    if (e.target === e.currentTarget) {
+                        this.toggleModal('libraryModal', false);
+                    }
+                };
+
+                document.getElementById('closeProfileBtn').onclick = () => this.toggleModal('profilePage', false);
+                document.getElementById('saveConfigBtn').onclick = () => this.saveConfig();
+                document.getElementById('resetConfigBtn').onclick = () => this.resetConfig();
+
+                this.dom.confirmDeleteBtn.onclick = () => this.executeDelete();
+                this.dom.cancelDeleteBtn.onclick = () => this.toggleModal('deleteConfirmModal', false);
+
+                this.dom.deleteConfirmModal.onclick = (e) => {
+                    if (e.target === e.currentTarget) {
+                        this.toggleModal('deleteConfirmModal', false);
+                    }
+                };
+
+                document.getElementById('progressBarContainer').onclick = (e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                    const v = document.getElementById(`video-p${slideIdx}`);
+                    if (v && v.duration) v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration;
+                };
+
+                // 统一的复杂手势拦截挂载 (长按, 拖拽, 双击)
+                const container = document.getElementById('app');
+                this.bindGestures(container);
+
+                // 键盘与遥控器适配
+                this.bindKeyboard();
+            }
+
+            bindKeyboard() {
+                let okClickCount = 0;
+                let okClickTimer = null;
+
+                document.addEventListener('keydown', (e) => {
+                    const profileActive = document.getElementById('profilePage').classList.contains('active');
+                    const libraryActive = !document.getElementById('libraryModal').classList.contains('hidden');
+
+                    // 如果正在输入（且不是在处理遥控器方向键时），不触发全局快捷键
+                    // 但我们要允许在输入框内通过上下键跳转焦点
+                    const isInput = ['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase());
+
+                    const key = e.key;
+                    const keyCode = e.keyCode;
+                    const lowKey = key.toLowerCase(); // 提前声明，全局可用
+
+                    // --- 个人中心 / 弹窗 / 网格列表内的空间导航 (Remote Control / Keyboard Focus) ---
+                    if (profileActive || libraryActive || document.getElementById('app').classList.contains('grid-active')) {
+                        const items = Array.from(document.querySelectorAll(
+                            profileActive ? '#profilePage .focusable-item' :
+                                libraryActive ? '#libraryModal .focusable-item' :
+                                    '#videoContainer .focusable-item'
+                        ));
+                        let currentIndex = items.indexOf(document.activeElement);
+                        if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight' ||
+                            lowKey === 'w' || lowKey === 'a' || lowKey === 's' || lowKey === 'd' ||
+                            [38, 40, 37, 39].includes(keyCode)) {
+                            e.preventDefault();
+                            if (currentIndex === -1) {
+                                let startItem = items[0];
+                                if (document.getElementById('app').classList.contains('grid-active')) {
+                                    startItem = items.find(it => it.dataset.index == this.state.currentIndex) || items[0];
+                                }
+                                startItem?.focus();
+                            } else {
+                                const isVideoGrid = document.getElementById('app').classList.contains('grid-active') && !profileActive && !libraryActive;
+                                if (isVideoGrid) {
+                                    // 视频网格：3 列规则偏移
+                                    let nextIdx = currentIndex;
+                                    if (key === 'ArrowDown' || lowKey === 's' || keyCode === 40) nextIdx += 3;
+                                    else if (key === 'ArrowUp' || lowKey === 'w' || keyCode === 38) nextIdx -= 3;
+                                    else if (key === 'ArrowRight' || lowKey === 'd' || keyCode === 39) nextIdx += 1;
+                                    else if (key === 'ArrowLeft' || lowKey === 'a' || keyCode === 37) nextIdx -= 1;
+
+                                    if (nextIdx >= 0 && nextIdx < items.length) {
+                                        items[nextIdx].focus();
+                                        items[nextIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                } else if (libraryActive) {
+                                    // 媒体库弹窗：基于屏幕坐标的空间导航
+                                    // 正确处理带分区标题的不连续网格，无论多少列都精准匹配视觉方向
+                                    const cur = items[currentIndex];
+                                    const curR = cur.getBoundingClientRect();
+                                    const curCx = curR.left + curR.width / 2;
+                                    const curCy = curR.top + curR.height / 2;
+
+                                    let dir;
+                                    if (key === 'ArrowDown' || lowKey === 's' || keyCode === 40) dir = 'down';
+                                    else if (key === 'ArrowUp' || lowKey === 'w' || keyCode === 38) dir = 'up';
+                                    else if (key === 'ArrowRight' || lowKey === 'd' || keyCode === 39) dir = 'right';
+                                    else if (key === 'ArrowLeft' || lowKey === 'a' || keyCode === 37) dir = 'left';
+
+                                    let best = null, bestScore = Infinity;
+                                    items.forEach(item => {
+                                        if (item === cur) return;
+                                        const r = item.getBoundingClientRect();
+                                        const cx = r.left + r.width / 2;
+                                        const cy = r.top + r.height / 2;
+                                        const dx = cx - curCx, dy = cy - curCy;
+                                        // 仅保留目标方向的元素（留 2px 容差）
+                                        if (dir === 'down' && dy <= 2) return;
+                                        if (dir === 'up' && dy >= -2) return;
+                                        if (dir === 'right' && dx <= 2) return;
+                                        if (dir === 'left' && dx >= -2) return;
+                                        // 评分：主轴距离优先，副轴偏移加权惩罚
+                                        const score = (dir === 'down' || dir === 'up')
+                                            ? Math.abs(dy) + Math.abs(dx) * 3
+                                            : Math.abs(dx) + Math.abs(dy) * 3;
+                                        if (score < bestScore) { bestScore = score; best = item; }
+                                    });
+
+                                    if (best) {
+                                        best.focus();
+                                        best.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                    }
+                                } else {
+                                    // 个人中心：线性跳转
+                                    if (key === 'ArrowDown' || lowKey === 's' || key === 'ArrowRight' || lowKey === 'd' || [40, 39].includes(keyCode)) {
+                                        currentIndex = (currentIndex + 1) % items.length;
+                                    } else {
+                                        currentIndex = (currentIndex - 1 + items.length) % items.length;
+                                    }
+                                    items[currentIndex].focus();
+                                }
+                            }
+                            return;
+                        }
+
+                        // OK / Enter 在焦点元素上触发点击
+                        if (key === 'Enter' || keyCode === 13) {
+                            if (document.activeElement && document.activeElement.classList.contains('focusable-item')) {
+                                // 如果是输入框，回车不拦截，允许系统处理（弹出键盘等）
+                                if (document.activeElement.tagName.toLowerCase() === 'input' && document.activeElement.type !== 'checkbox') {
+                                    return;
+                                }
+                                e.preventDefault();
+                                document.activeElement.click();
+                                return;
+                            }
+                        }
+                    }
+
+                    if (isInput) return;
+
+                    // 1. 上下方向键 / WS：切换视频 (Keyboard & Remote)
+                    if (key === 'ArrowUp' || lowKey === 'w' || keyCode === 38) {
+                        e.preventDefault();
+                        this.prevVideo();
+                    } else if (key === 'ArrowDown' || lowKey === 's' || keyCode === 40) {
+                        e.preventDefault();
+                        this.nextVideo();
+                    }
+                    // 2. 左右方向键 / AD：快进快退 15 秒 (Keyboard & Remote)
+                    else if (key === 'ArrowLeft' || lowKey === 'a' || keyCode === 37) {
+                        e.preventDefault();
+                        const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                        const v = document.getElementById(`video-p${slideIdx}`);
+                        if (v) v.currentTime = Math.max(0, v.currentTime - 15);
+                        this.showInterfaceTemp();
+                    } else if (key === 'ArrowRight' || lowKey === 'd' || keyCode === 39) {
+                        e.preventDefault();
+                        const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                        const v = document.getElementById(`video-p${slideIdx}`);
+                        if (v && v.duration) v.currentTime = Math.min(v.duration, v.currentTime + 15);
+                        this.showInterfaceTemp();
+                    }
+                    // 3. 确认逻辑：空格键 (Keyboard) & OK键 (Remote)
+                    else if (key === ' ' || key === 'Enter' || keyCode === 13) {
+                        e.preventDefault();
+                        if (key === ' ') {
+                            // 键盘空格：暂停/播放
+                            this.togglePlay();
+                        } else {
+                            // 遥控器 OK 键: 单击暂停/播放，双击收藏
+                            okClickCount++;
+                            if (okClickCount === 1) {
+                                okClickTimer = setTimeout(() => {
+                                    this.togglePlay();
+                                    okClickCount = 0;
+                                }, 300);
+                            } else if (okClickCount === 2) {
+                                clearTimeout(okClickTimer);
+                                okClickCount = 0;
+                                // 在屏幕中心弹出收藏动画与逻辑
+                                this.handleDoubleTap(window.innerWidth / 2, window.innerHeight / 2);
+                            }
+                        }
+                    }
+                    // 4. 菜单键/缩放键 (j / Menu)
+                    else if (key.toLowerCase() === 'j' || keyCode === 18 || keyCode === 93 || keyCode === 118) {
+                        if (key.toLowerCase() === 'j' || [18, 93, 118].includes(keyCode)) {
+                            e.preventDefault();
+                            this.toggleScaleMode();
+                            this.showInterfaceTemp();
+                        }
+                    }
+                    // 5. 新增快捷键适配 (R, E, F, G, V, I, U, M)
+                    else {
+                        if (lowKey === 'r') {
+                            this.dom.playModeBtn.click(); // 触发视觉反馈
+                        } else if (lowKey === 'f') {
+                            this.dom.fullscreenBtn.click();
+                        } else if (lowKey === 'e') {
+                            this.dom.viewModeBtn.click(); // 触发视觉反馈
+                        } else if (lowKey === 'g') {
+                            const modal = document.getElementById('libraryModal');
+                            if (modal && !modal.classList.contains('hidden')) {
+                                this.toggleModal('libraryModal', false);
+                            } else {
+                                this.showLibraries();
+                                this.dom.libraryBtn.classList.remove('nav-clicked');
+                                void this.dom.libraryBtn.offsetWidth;
+                                this.dom.libraryBtn.classList.add('nav-clicked');
+                                setTimeout(() => this.dom.libraryBtn.classList.remove('nav-clicked'), 1000);
+                            }
+                        } else if (lowKey === 'i') {
+                            const modal = document.getElementById('profilePage');
+                            if (modal && modal.classList.contains('active')) {
+                                this.toggleModal('profilePage', false);
+                            } else {
+                                this.toggleModal('profilePage', true);
+                                this.dom.myBtn.classList.remove('nav-clicked');
+                                void this.dom.myBtn.offsetWidth;
+                                this.dom.myBtn.classList.add('nav-clicked');
+                                setTimeout(() => this.dom.myBtn.classList.remove('nav-clicked'), 1000);
+                            }
+                        } else if (lowKey === 'v') {
+                            // 格子视图模式下屏蔽流媒体详情快捷键
+                            const isGridActive = document.getElementById('app').classList.contains('grid-active');
+                            if (!isGridActive) {
+                                if (!this.dom.mediaInfoModal.classList.contains('hidden')) {
+                                    this.toggleModal('mediaInfoModal', false);
+                                } else {
+                                    this.showMediaInfo();
+                                }
+                            }
+                        } else if (lowKey === 'u') {
+                            this.handleDoubleTap(window.innerWidth / 2, window.innerHeight / 2);
+                        } else if (lowKey === 'm') {
+                            this.dom.muteBtn.click();
+                        }
+                    }
+                });
+            }
+
+            bindGestures(container) {
+                let state = 'IDLE'; // IDLE, SPEED, DRAG
+                let x0 = 0, y0 = 0;
+                let t0 = 0;
+                let longPressTimer = null;
+                let clickTimer = null;
+                let clickCount = 0;
+                let targetTime = 0;
+                let originalTime = 0;
+                let gestureActive = false; // 防止右侧工具栏误触活动手势状态机
+
+                // CSS 锁死: touch-action: none 禁止浏览器抢占所有方向的手势
+                // 不用 pan-y，否则 iOS 会在垂直 swipe 时触发 touchcancel，导致切换视频失效
+                container.style.touchAction = 'none';
+                container.style.userSelect = 'none';
+                container.style.webkitUserSelect = 'none';
+
+                const speedToast = document.createElement('div');
+                speedToast.className = 'absolute top-[calc(env(safe-area-inset-top)+20px)] left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-bold opacity-0 transition-opacity z-50 pointer-events-none flex items-center gap-2';
+                speedToast.innerHTML = '<i data-lucide="fast-forward" class="w-4 h-4 text-green-400"></i><span>2 倍速播放中</span>';
+                document.getElementById('app').appendChild(speedToast);
+                lucide.createIcons();
+
+                const startHandler = (e) => {
+                    if (this.state.viewMode !== 'stream') { gestureActive = false; return; }
+                    // 黑名单：点击这些 UI 元素时不触发手势（播放/暂停/滑动）
+                    const excluded = [
+                        '.bottom-nav',    // 底部导航栏
+                        '.bottom-info',   // 底部进度条+标题区域
+                        '.right-toolbar', // 右侧收藏/缩放/静音
+                        '#fullscreenBtn', // 右上角全屏按钮
+                        '#deleteBtn',     // 左上角删除按钮
+                        '#libraryModal',  // 媒体源选择弹窗
+                        '#mediaInfoModal',// 流媒体信息弹窗
+                        '#deleteConfirmModal', // 删除确认弹窗
+                        '.profile-layer', // 个人中心全屏面板
+                    ];
+                    if (excluded.some(sel => e.target.closest(sel))) {
+                        gestureActive = false;
+                        return;
+                    }
+
+                    gestureActive = true;
+                    state = 'IDLE';
+                    // 注释：用户触摸屏幕开始手势时不再重置计时器，
+                    // 只有在 endHandler 中确认为有效交互（点击/进度拖拽）才重置。
+                    // 这样可以避免“上下滑动切换视频”也会不间断刷新清屏计时。
+                    const t = e.touches ? e.touches[0] : e;
+                    x0 = t.clientX;
+                    y0 = t.clientY;
+                    t0 = Date.now();
+
+                    const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                    const v = document.getElementById(`video-p${slideIdx}`);
+                    if (v) originalTime = v.currentTime;
+
+                    clearTimeout(longPressTimer);
+                    longPressTimer = setTimeout(() => {
+                        if (state === 'IDLE') {
+                            state = 'SPEED';
+                            if (v) v.playbackRate = 2.0;
+                            speedToast.classList.remove('opacity-0');
+                        }
+                    }, 300);
+                };
+
+                const moveHandler = (e) => {
+                    if (!gestureActive || this.state.viewMode !== 'stream') return;
+                    const t = e.touches ? e.touches[0] : e;
+                    const diffX = t.clientX - x0;
+                    const diffY = t.clientY - y0;
+
+                    // 如果横向滑动大于纵向滑动，拦截系统返回手势
+                    if (Math.abs(diffX) > Math.abs(diffY)) {
+                        if (e.cancelable) e.preventDefault();
+                    }
+
+                    if (Math.abs(diffX) > 15 || Math.abs(diffY) > 15) {
+                        clearTimeout(longPressTimer);
+
+                        if (state === 'SPEED') {
+                            speedToast.classList.add('opacity-0');
+                            const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                            const v = document.getElementById(`video-p${slideIdx}`);
+                            if (v) v.playbackRate = 1.0;
+                        }
+
+                        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 15) {
+                            state = 'DRAG';
+                        }
+                    }
+
+                    if (state === 'DRAG') {
+                        if (e.cancelable) e.preventDefault();
+                        const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                        const v = document.getElementById(`video-p${slideIdx}`);
+                        if (v && v.duration) {
+                            const ratio = diffX / (window.innerWidth / 2);
+                            targetTime = originalTime + (ratio * v.duration);
+                            targetTime = Math.max(0, Math.min(targetTime, v.duration));
+
+                            // 仅更新UI预览，不修改 currentTime 防止卡顿
+                            const progressEl = document.getElementById('progressLine');
+                            if (progressEl) progressEl.style.width = `${(targetTime / v.duration) * 100}%`;
+                        }
+                    }
+                };
+
+                const endHandler = (e) => {
+                    if (!gestureActive || this.state.viewMode !== 'stream') return;
+                    gestureActive = false;
+                    clearTimeout(longPressTimer);
+
+                    const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                    const v = document.getElementById(`video-p${slideIdx}`);
+
+                    if (state === 'SPEED') {
+                        if (v) v.playbackRate = 1.0;
+                        speedToast.classList.add('opacity-0');
+                        state = 'IDLE';
+                        // 结束倍速播放属于有效交互，重置/开始清屏计时
+                        this.showInterfaceTemp();
+                        return;
+                    }
+
+                    if (state === 'DRAG') {
+                        if (v) v.currentTime = targetTime;
+                        state = 'IDLE';
+                        // 结束进度拖拽属于有效交互，重置/开始清屏计时
+                        this.showInterfaceTemp();
+                        return;
+                    }
+
+                    state = 'IDLE';
+                    const t = e.changedTouches ? e.changedTouches[0] : e;
+                    const diffX = t.clientX - x0;
+                    const diffY = t.clientY - y0;
+                    const time = Date.now() - t0;
+
+                    if (Math.abs(diffY) > 50 && Math.abs(diffY) > Math.abs(diffX)) {
+                        diffY < 0 ? this.nextVideo() : this.prevVideo();
+                        return;
+                    }
+
+                    if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10 && time < 300) {
+                        clickCount++;
+                        if (clickCount === 1) {
+                            clickTimer = setTimeout(() => {
+                                const app = document.getElementById('app');
+                                if (app.classList.contains('interface-hidden')) {
+                                    app.classList.remove('interface-hidden');
+                                    this.showInterfaceTemp();
+                                } else {
+                                    this.togglePlay();
+                                }
+                                clickCount = 0;
+                            }, 250);
+                        } else if (clickCount === 2) {
+                            clearTimeout(clickTimer);
+                            clickCount = 0;
+                            this.handleDoubleTap(t.clientX, t.clientY);
+                        }
+                    }
+                };
+
+                // 屏蔽选中和长按菜单
+                container.style.userSelect = 'none';
+                container.style.webkitUserSelect = 'none';
+
+                // 将事件绑定转移到触控遮罩层 (.touch-layer) 或容器，并通过事件拦截进一步确保右键菜单不弹出
+                container.addEventListener('contextmenu', (e) => {
+                    // 如果是在视频区域触发的长按，禁止默认菜单
+                    if (e.target.closest('.touch-layer') || e.target.tagName.toLowerCase() === 'video') {
+                        e.preventDefault();
+                    }
+                });
+
+                // 直接绑定到 container，让 startHandler 内部的排除逻辑自行处理
+                container.addEventListener('touchstart', startHandler, { passive: true });
+                container.addEventListener('touchmove', moveHandler, { passive: false });
+
+                // 记录最后一次 touchend 的时间，用于过滤手机浏览器合成的鼠标事件
+                let lastTouchEnd = 0;
+                container.addEventListener('touchend', (e) => {
+                    lastTouchEnd = Date.now();
+                    endHandler(e);
+                });
+                container.addEventListener('touchcancel', () => { gestureActive = false; state = 'IDLE'; clearTimeout(longPressTimer); speedToast.classList.add('opacity-0'); });
+
+                // 鼠标适配层 (PC 端)。如果距上次 touchend < 500ms，则是手机浏览器合成事件，直接忽略
+                let isMouseDown = false;
+                container.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    if (Date.now() - lastTouchEnd < 500) return; // 屏蔽手机合成鼠标事件
+                    isMouseDown = true;
+                    e.touches = [{ clientX: e.clientX, clientY: e.clientY }];
+                    startHandler(e);
+                });
+                container.addEventListener('mousemove', (e) => {
+                    if (!isMouseDown) return;
+                    e.touches = [{ clientX: e.clientX, clientY: e.clientY }];
+                    moveHandler(e);
+                });
+                const mouseEndHandler = (e) => {
+                    if (!isMouseDown) return;
+                    isMouseDown = false;
+                    e.changedTouches = [{ clientX: e.clientX, clientY: e.clientY }];
+                    endHandler(e);
+                };
+                container.addEventListener('mouseup', mouseEndHandler);
+                container.addEventListener('mouseleave', mouseEndHandler);
+            }
+
+            // 新增: 双击点赞动画与收藏逻辑
+            async handleDoubleTap(x, y) {
+                // 1. 点赞动画 DOM 生成
+                const heart = document.createElement('div');
+                heart.innerHTML = '<i data-lucide="heart" class="fill-red-500 text-red-500 w-16 h-16 drop-shadow-xl"></i>';
+                heart.className = 'absolute pointer-events-none z-50 transform pointer-events-none transition-all duration-700 ease-out';
+
+                // 随机偏转角度
+                const rotation = Math.floor(Math.random() * 40) - 20;
+                heart.style.left = `${x - 32}px`;
+                heart.style.top = `${y - 32}px`;
+                heart.style.transform = `scale(0.5) rotate(${rotation}deg)`;
+                heart.style.opacity = '0';
+
+                document.getElementById('app').appendChild(heart);
+                lucide.createIcons({ root: heart });
+
+                // 动画序列
+                requestAnimationFrame(() => {
+                    heart.style.transform = `scale(1.2) rotate(${rotation}deg)`;
+                    heart.style.opacity = '1';
+
+                    setTimeout(() => {
+                        heart.style.transform = `scale(1) rotate(${rotation}deg) translateY(-100px)`;
+                        heart.style.opacity = '0';
+                        setTimeout(() => heart.remove(), 700);
+                    }, 200);
+                });
+
+                // 2. 自动标记收藏（如未收藏则添加）
+                const currentVideo = this.state.videos[this.state.currentIndex];
+                if (currentVideo && !currentVideo.UserData?.IsFavorite) {
+                    try {
+                        const { server, token, userId } = this.config;
+                        const res = await fetch(`${server}/emby/Users/${userId}/FavoriteItems/${currentVideo.Id}?api_key=${token}`, { method: 'POST' });
+                        if (res.ok) {
+                            if (!currentVideo.UserData) currentVideo.UserData = {};
+                            currentVideo.UserData.IsFavorite = true;
+                            // 同步到本地 Set
+                            this.state.favorites.add(String(currentVideo.Id));
+
+                            // 高亮右侧收藏图标
+                            const favBtn = document.getElementById('favoriteBtn');
+                            if (favBtn) {
+                                favBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="folder-heart" class="text-secondary w-6 h-6 drop-shadow-md"></i></div>`;
+                                lucide.createIcons({ root: favBtn });
+                            }
+                            this.showToast('❤️ 已收藏');
+                        }
+                    } catch (e) { console.error('Double tap favorite failed:', e); }
+                }
+            }
+
+            // --- 通用辅助 ---
+            toggleModal(id, show) {
+                const el = document.getElementById(id);
+                if (id === 'profilePage') {
+                    if (show) { el.classList.add('active'); this.state.currentTab = 'my'; }
+                    else { el.classList.remove('active'); }
+                    if (show) this.updateTabHighlight();
+                } else {
+                    if (show) el.classList.remove('hidden'); else el.classList.add('hidden');
+                }
+
+                // 遥控器优化：打开时自动聚焦到已选中项，如没有已选中则聚焦到第一个
+                if (show) {
+                    setTimeout(() => {
+                        const allItems = Array.from(el.querySelectorAll('.focusable-item'));
+                        // 优先已选中项（带主题色背景），避免从第一项闪现的过渡
+                        const selected = allItems.find(i => i.classList.contains('bg-primary/20'));
+                        const target = selected || allItems[0];
+                        if (target) target.focus();
+                    }, 300);
+                } else {
+                    if (document.activeElement && document.activeElement.closest(`#${id}`)) {
+                        document.activeElement.blur();
+                    }
+                }
+
+                // 核心逻辑：无论打开还是关闭弹窗，都调用 showInterfaceTemp
+                this.showInterfaceTemp();
+            }
+
+            toggleLoading(show) {
+                const el = this.dom.loading;
+                if (show) {
+                    el.classList.remove('hidden');
+                    // 加载中强制隐藏当前播放按钮，避免状态冲突导致的闪烁
+                    const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                    const btn = document.getElementById(`playBtn-${slideIdx}`);
+                    if (btn) btn.classList.remove('paused');
+                } else {
+                    el.classList.add('hidden');
+                }
+            }
+
+            showToast(msg, duration = 3000) {
+                // 清除上一个计时器，防止快速连发 Toast 时提前消失
+                // duration: 显示时长（ms），默认 3000。重要提示可传更大值，如 5000
+                if (this._toastTimer) clearTimeout(this._toastTimer);
+                const t = this.dom.toast;
+                t.textContent = msg;
+                t.classList.remove('opacity-0');
+                this._toastTimer = setTimeout(() => t.classList.add('opacity-0'), duration);
+            }
+
+            formatTime(s) {
+                if (!s) return '00:00';
+                const m = Math.floor(s / 60);
+                const sec = Math.floor(s % 60);
+                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            }
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            window.app = new EmbyApp();
+
+            // 注册 Service Worker 以满足安卓 PWA 安装要求
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.log('SW Failed', err));
+            }
+        };
+    </script>
+</body>
+
+</html>
+<!--
+  End of EmbyX.
+  探索更多：谢週五の藏经阁 (https://5nav.eu.org)
+  Keep Coding, Keep Fun.
+-->

@@ -1,0 +1,47 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'README_zh.md'
+      - '.github/**'
+  workflow_dispatch:
+
+# 使用 concurrency 结合延迟效果来实现类似“修改后30分钟构建”的需求是不太直接的。
+# 通常 GitHub Actions 在 push 后立即触发。
+# 如果需要“合并触发”，可以使用 workflow_run 或在 push 触发时先 sleep。
+# 但为了可靠性，这里采用标准的 push 触发，并配合并发限制。
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: actions/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/embyx:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
