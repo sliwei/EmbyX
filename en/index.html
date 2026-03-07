@@ -1,7 +1,7 @@
 <!--
   EmbyX - Short Video Player for Emby
-  © 2026 谢週五 (https:
-  著作权所有·设计与开发
+  Juneix (https://github.com/juneix)
+  © 2026 All Rights Reserved
 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -40,13 +40,10 @@
     </script>
     <style type="text/tailwindcss">
         @layer utilities {
-            /* Styles */
             .video-fullscreen {
                 @apply w-full h-full absolute inset-0 z-10;
             }
             
-            /* Styles */
-            /* Styles */
             .slide-container {
                 @apply relative w-screen overflow-hidden bg-black;
                 height: 100dvh;
@@ -57,12 +54,10 @@
                 }
             }
             
-            /* Styles */
             .slide-item {
                 @apply absolute top-0 left-0 w-full h-full z-10;
             }
             
-            /* Styles */
             .play-pause-btn {
                 @apply absolute top-1/2 left-1/2 w-16 h-16 rounded-full flex items-center justify-center z-20 opacity-0 pointer-events-none transition-all duration-200 ease-out bg-black/30;
                 transform: translate(-50%, -50%) scale(1.5);
@@ -75,7 +70,6 @@
                 @apply text-2xl text-white;
             }
 
-            /* Styles */
             .interface-hidden .bottom-info,
             .interface-hidden .bottom-nav,
             .interface-hidden .right-toolbar,
@@ -84,7 +78,6 @@
                 @apply opacity-0 pointer-events-none transition-opacity duration-300;
             }
 
-            /* Styles */
             .grid-active .bottom-info,
             .grid-active .right-toolbar,
             .grid-active #fullscreenBtn,
@@ -92,12 +85,10 @@
                 @apply opacity-0 pointer-events-none transition-opacity duration-300;
             }
             
-            /* Styles */
             .focusable-item:focus {
                 @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-black z-20;
             }
 
-            /* Styles */
             .profile-layer {
                 @apply fixed top-0 left-0 w-full h-full z-[60] translate-y-full transition-transform duration-300 ease-in-out;
             }
@@ -105,12 +96,10 @@
                 @apply translate-y-0;
             }
 
-            /* Styles */
             .progress-line {
                 @apply h-full bg-white transition-[width] duration-100 ease-linear;
             }
 
-            /* Styles */
             .nav-btn {
                 @apply relative flex flex-col items-center justify-center w-1/4 h-full cursor-pointer transition-colors duration-300 z-10;
                 -webkit-tap-highlight-color: transparent;
@@ -293,7 +282,7 @@
                         <div class="space-y-4 bg-gray-800/40 p-4 rounded-lg border border-gray-700/50">
                             <div>
                                 <label class="text-gray-400 text-xs block mb-1.5">Server URL</label>
-                                <input type="text" id="configServer" placeholder="* Use HTTPS for online web ver."
+                                <input type="text" id="configServer" placeholder="Use HTTPS for remote connections"
                                     class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
@@ -358,28 +347,26 @@
                             <div class="flex items-center">
                                 <h3 class="text-white font-bold text-2xl tracking-tight">📱 EmbyX</h3>
                                 <span
-                                    class="ml-2 px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full border border-primary/30">v1.1</span>
+                                    class="ml-2 px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full border border-primary/30">v1.0</span>
                             </div>
 
                             <div>
-                                <p class="text-gray-300">👋 Hi, I am <a href="https://juneix.github.io" target="_blank"
-                                        class="text-primary hover:underline">@Juneix</a>. EmbyX is a web-native
-                                    application designed specifically for Emby/Jellyfin. It perfectly recreates the
-                                    immersive short-video interactive experience, giving your private media library a
-                                    brand-new way to browse. 🎉</p>
+                                <p class="text-gray-300">👋 Hi, I am <a href="https://github.com/juneix" target="_blank"
+                                        class="text-primary hover:underline">@Juneix</a>. EmbyX is a TikTok-style web
+                                    player for Emby / Jellyfin. Experience your private media library in a whole new,
+                                    immersive way. 🎉</p>
                             </div>
 
                             <div
                                 class="text-yellow-500/90 text-xs bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-                                <i data-lucide="alert-triangle" class="w-3 h-3 mr-1 inline"></i>
-                                Notice: All data stays local; open-source for self-hosting.
+                                <i data-lucide="shield-check" class="w-3 h-3 mr-1 inline"></i>
+                                All data stays on your device. Free to use.
                             </div>
 
                             <div>
                                 <h4 class="text-gray-300">🔮 Playback</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
                                     <li>Native HTML5 player, best on modern devices.</li>
-                                    <li>Enjoy smooth 8K AV1 videos on Android ➕ Direct Play.</li>
                                     <li>Older devices can use server transcoding.</li>
                                 </ul>
                                 <div class="bg-black/40 rounded-lg overflow-hidden border border-gray-700/50 mt-3">
@@ -424,8 +411,8 @@
                                 <h4 class="text-gray-300">🧩 Tips & Tricks</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
                                     <li>Setup: Use a dedicated account; < 1,000 videos per library.</li>
-                                    <li>PWA: 📲 Add to Home Screen or Install as App on any browser.</li>
-                                    <li>Controls: Full Mouse, Keyboard, and Remote support for PC & TV.</li>
+                                    <li>PWA: 📲 Add to Home Screen or Install as App.</li>
+                                    <li>Controls: Full Mouse, Keyboard support for PC & TV.</li>
                                 </ul>
                             </div>
 
@@ -448,7 +435,7 @@
                                             <tr>
                                                 <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">A / D /
                                                     ← / →</td>
-                                                <td class="px-3 py-1.5">Rewind / Fast-fw 15s</td>
+                                                <td class="px-3 py-1.5">Rewind / Forward 15s</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">Space /
@@ -477,7 +464,7 @@
                                             </tr>
                                             <tr>
                                                 <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">E</td>
-                                                <td class="px-3 py-1.5">Toggle View Mode</td>
+                                                <td class="px-3 py-1.5">Toggle View</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-3 py-1.5 text-primary border-r border-gray-700/50">R</td>
@@ -502,18 +489,27 @@
                             </div>
 
                             <div>
-                                <h4 class="text-gray-300">🚀 Support</h4>
+                                <h4 class="text-gray-300">🚀 Get Involved</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs mt-3">
-                                    <li><span class="text-gray-300 font-medium">Support Me:</span> Help me develop more
-                                        cool tools.</li>
+                                    <li><span class="text-gray-300 font-medium">Community:</span> Follow the latest
+                                        updates.</li>
+                                    <li><span class="text-gray-300 font-medium">Support:</span> Help me build more cool
+                                        stuff.</li>
                                 </ul>
-                                <div class="flex justify-start space-x-3 mt-4">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                                    <a href="https://x.com/juneix_tse" target="_blank"
+                                        class="flex items-center justify-center text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors border border-white/20 text-[10px] whitespace-nowrap">
+                                        <i data-lucide="twitter"
+                                            class="w-3.5 h-3.5 mr-1.5 grayscale brightness-200"></i> X / Twitter</a>
+                                    <a href="https://t.me/juneix_en" target="_blank"
+                                        class="flex items-center justify-center text-[#26A5E4] bg-[#26A5E4]/10 hover:bg-[#26A5E4]/20 px-3 py-1.5 rounded-full transition-colors border border-[#26A5E4]/20 text-[10px] whitespace-nowrap">
+                                        <i data-lucide="send" class="w-3.5 h-3.5 mr-1.5"></i> Telegram</a>
                                     <a href="https://ko-fi.com/juneixtse" target="_blank"
-                                        class="flex items-center text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-full transition-colors border border-primary/20">☕
-                                        Ko-fi</a>
+                                        class="flex items-center justify-center text-[#FF5E5B] bg-[#FF5E5B]/10 hover:bg-[#FF5E5B]/20 px-3 py-1.5 rounded-full transition-colors border border-[#FF5E5B]/20 text-[10px] whitespace-nowrap">
+                                        <i data-lucide="coffee" class="w-3.5 h-3.5 mr-1.5"></i> Ko-fi</a>
                                     <a href="https://paypal.me/juneixtse" target="_blank"
-                                        class="flex items-center text-[#ffc439] bg-[#ffc439]/10 hover:bg-[#ffc439]/20 px-3 py-1.5 rounded-full transition-colors border border-[#ffc439]/20">💳
-                                        PayPal</a>
+                                        class="flex items-center justify-center text-[#ffc439] bg-[#ffc439]/10 hover:bg-[#ffc439]/20 px-3 py-1.5 rounded-full transition-colors border border-[#ffc439]/20 text-[10px] whitespace-nowrap">
+                                        <i data-lucide="credit-card" class="w-3.5 h-3.5 mr-1.5"></i> PayPal</a>
                                 </div>
                             </div>
 
@@ -687,7 +683,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.0"`
                         },
                         body: JSON.stringify({ Username: user, Pw: pwd })
                     });
@@ -851,7 +847,6 @@
                 }
             }
 
-            /* Styles */
             renderSlides() {
                 this.dom.videoContainer.innerHTML = '';
                 this.dom.videoContainer.className = 'relative w-full h-full transition-transform duration-300 ease-out';
@@ -2530,6 +2525,6 @@
 </html>
 <!--
   End of EmbyX.
-  Discover more: June's Hub (https://5nav.eu.org)
+  Made with ❤️ by Juneix (https://github.com/juneix)
   Keep Coding, Keep Fun.
 -->

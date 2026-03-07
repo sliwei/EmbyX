@@ -1,20 +1,33 @@
-# 📱 EmbyX 竖屏播放器 `v1.1`
+# 📱 EmbyX
 
-> 这是一个技术小白借助 Antigravity 和 Emby API 制作的 Web 应用，仿抖音风格浏览、管理 Emby 的短视频。
-
----
+EmbyX 是一款专为 Emby / Jellyfin 打造的 Web 原生应用，完美复刻抖音·短视频沉浸式交互，让你的私人媒体库焕发全新的刷片体验。🎉
 
 ## ✨ 功能特色
 
 - **流式播放**：抖音风格上下滑动，沉浸式全屏体验
-- **格子视图**：封面墙浏览，支持分页与随机换一批
-- **直接播放**（Direct Play）：安卓 AV1、8K 不转码
-- **收藏管理**：一键收藏 / 取消，同步 Emby 数据库
-- **键鼠适配**：完整键盘快捷键，电视/电脑浏览器友好
-- **PWA 支持**：可安装为桌面/主屏幕应用
-- **私有化部署**：数据本地存储，不上传云端
+- **直接播放**：安卓最高支持 8K HEVC / AV1 不转码
+- **相册视图**：封面墙浏览，支持分页、换一批
+- **Emby 同步**：支持媒体库、播放列表、收藏夹
+- **键鼠适配**：纯按键控制，电脑、电视轻松摸鱼
+- **PWA 支持**：添加到主屏幕 / 作为应用安装
+- **隐私第一**：数据本地存储，绝不上传云端
 
----
+
+## 💡 快速开始
+
+推荐直接访问我的 EmbyX 官方网站，开箱即用：
+- 🌐 **主站点** - [dy.5nav.eu.org](https://dy.5nav.eu.org)
+- ⚡ **镜像站** - [dy.5nav.pp.ua](https://dy.5nav.pp.ua)
+
+喜欢完全控制？你也可以自托管 EmbyX 应用。
+
+
+## 📢 广而告之
+
+如果 EmbyX 让你的数字生活变得更轻松，请分享给你的朋友或在社交媒体上推荐它！作为一名独立开发者，你的口碑是帮助这个项目成长最好的方式。
+
+> 喜欢这个项目吗？[欢迎打赏支持！](#❤️-支持项目)
+
 
 ## 🔮 播放性能
 
@@ -45,91 +58,48 @@
 
 ---
 
-## 🧩 使用技巧
-
-- **原生全屏**：iOS 系统限制，不支持全屏按钮
-- **PWA 应用**：浏览器 📲 添加到主屏幕 / 作为应用安装
-- **键鼠适配**：电脑、电视浏览器也能快乐摸鱼
-- **媒体库建议**：单个媒体库建议不超过 **1000 个视频**，可建立多个媒体库分层管理
-
----
-
-## 🛠️ 技术栈
-
-| 层级 | 技术 |
-|---|---|
-| **结构** | HTML5 语义化标签 |
-| **样式** | Tailwind CSS（CDN，JIT 按需） |
-| **逻辑** | 原生 JavaScript（无框架） |
-| **图标** | Lucide Icons（CDN） |
-| **数据** | Emby REST API |
-| **离线支持** | Service Worker（PWA） |
-| **容器** | Nginx Alpine（Docker 部署时） |
-
----
-
 ## 📁 文件目录
 
 ```
 embyx/
-├── index.html        # 核心文件，包含所有逻辑与样式
-├── poster.webp       # 自定义默认封面图（可替换）
-├── manifest.json     # PWA 配置文件
-├── sw.js             # Service Worker（离线缓存）
-├── icon.png          # PWA 图标
+├── zh/               # 中文版资源
+├── en/               # 英文版资源
+├── README.md         # 英文说明文档 (默认)
+├── README_zh.md      # 中文说明文档
 ├── Dockerfile        # Docker 镜像构建文件
-└── docker-compose.yml  # 一键部署配置
+├── docker-compose.yml # Docker Compose 配置文件
+├── entrypoint.sh     # Docker 启动脚本
+└── nginx.conf        # Nginx 配置文件
 ```
 
 ---
 
 ## 🚀 部署方式
 
-### 方式一：直接部署（推荐个人用户）
+### 方式一：直接托管（推荐）
 
-将以下文件放入任意 Web 服务器（Nginx、Apache、NAS 静态服务等）根目录：
+只需将 `zh/` 文件夹中的所有文件放入你的 Web 服务器（Nginx、Apache 等）根目录即可。
 
-```
-index.html
-poster.webp
-manifest.json
-sw.js
-icon.png
-```
+### 方式二：飞牛应用
 
-> **尝鲜玩法**：手机可以直接双击 `index.html`（file:// 协议）本地使用，通过 HTTP 访问 Emby。
+EmbyX 即将上架飞牛商店（审核中），加入交流群可下载 fpk 文件手动安装。
 
----
+### 方式三：Docker 部署
 
-### 方式二：Docker 部署
+如果你不想折腾 Web 环境，可以使用 Docker 快速部署。
 
-#### 使用 Docker
-
+#### 使用 Docker: 
 ```bash
-# 拉取最新镜像
-docker pull ghcr.io/juneix/embyx:latest
-
-# 运行容器（映射到本机 8080 端口）
 docker run -d \
   --name embyx \
   --network host \
   -e APP_LANG=zh \
   -e APP_PORT=8090 \
-  --restart unless-stopped \
   ghcr.io/juneix/embyx:latest
 ```
 
-访问 `http://your-server-ip:8080` 即可使用。
-
-#### 使用 docker-compose（推荐）
-
-```bash
-# 下载 docker-compose.yml 后执行
-docker compose up -d
-```
-
-或者直接复制到群晖、飞牛、Dockge 的 docker-compose 模板：
-```bash
+#### 使用 Docker Compose:
+```yaml
 services:
   embyx:
     image: ghcr.io/juneix/embyx:latest
@@ -137,14 +107,27 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - APP_LANG=zh # zh (中文), en (英文)
-      - APP_PORT=8090 # 在 host 模式下，直接定义访问端口
+      - APP_LANG=zh # 中文版
+      - APP_PORT=8090 # 访问端口
 ```
----
+
+## ❤️ 支持项目
+
+- 打赏鼓励：支持我开发更多有趣应用
+- 互动群聊：加入 💬 [QQ 群](mqqapi://card/show_pslcard?src_type=internal&version=1&uin=646913307&card_type=group&source=qrcode)可在线催更
+- 更多内容：访问 ➡️ [谢週五の藏经阁](https://5nav.eu.org)
+
+<div align="center">
+  <div style="display: inline-block; margin: 10px;">
+    <img src="./zh/wechat.webp" width="128" />
+    <br/><sub>微信</sub>
+  </div>
+  <div style="display: inline-block; margin: 10px;">
+    <img src="./zh/alipay.webp" width="128" />
+    <br/><sub>支付宝</sub>
+  </div>
+</div>
 
 ## 📝 开源协议
 
 MIT License — 随意使用，欢迎 PR 和 Issue。
-
-👨🏻‍💻 作者：[@谢週五](https://juneix.github.io)  
-🛜 官网：[谢週五の藏经阁](https://5nav.eu.org)

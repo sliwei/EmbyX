@@ -299,7 +299,7 @@
                         <div class="space-y-4 bg-gray-800/40 p-4 rounded-lg border border-gray-700/50">
                             <div>
                                 <label class="text-gray-400 text-xs block mb-1.5">服务器地址</label>
-                                <input type="text" id="configServer" placeholder="非局域网请使用 https 协议*"
+                                <input type="text" id="configServer" placeholder="非局域网请使用 HTTPS"
                                     class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
@@ -372,22 +372,19 @@
                             <div>
                                 <p class="text-gray-300">👋 Hi～我叫<a href="https://juneix.github.io" target="_blank"
                                         class="text-primary hover:underline">@谢週五</a>，EmbyX 是一款专为 Emby / Jellyfin 打造的
-                                    Web 原生应用，完美复刻短视频沉浸式交互，让你的私人媒体库焕发全新的刷片体验。🎉</p>
+                                    Web 原生应用，完美复刻抖音·短视频沉浸式交互，让你的私人媒体库焕发全新的刷片体验。🎉</p>
                             </div>
 
                             <div
                                 class="text-yellow-500/90 text-xs bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-                                <i data-lucide="alert-triangle" class="w-3 h-3 mr-1 inline"></i>
-                                提醒：数据本地存储，不上传云端；项目开源，可私有化部署。
+                                <i data-lucide="shield-check" class="w-3 h-3 mr-1 inline"></i>
+                                数据全程保存在本地，完全免费。
                             </div>
 
                             <div>
                                 <h4 class="text-gray-300">🔮 播放性能</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
                                     <li>原生 HTML5 播放器，新设备体验最佳</li>
-                                    <li>直接播放 <code
-                                            class="bg-gray-700 px-1 rounded text-xs text-gray-200"> Direct Play</code>，安卓
-                                        8K、AV1 不转码</li>
                                     <li>老设备需服务器转码，<del>不如放到**上回收了(没打钱</del>😂</li>
                                 </ul>
                                 <div class="bg-black/40 rounded-lg overflow-hidden border border-gray-700/50 mt-3">
@@ -428,8 +425,8 @@
                                 <h4 class="text-gray-300">🧩 使用技巧</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
                                     <li>配置建议：新建专用账号，每个媒体库 < 1000 个视频</li>
-                                    <li>PWA应用：全平台浏览器 📲 添加到主屏幕/作为应用安装</li>
-                                    <li>键鼠适配：电脑、电视浏览器也能快乐摸鱼</li>
+                                    <li>PWA应用：📲 添加到主屏幕/作为应用安装</li>
+                                    <li>键鼠适配：纯按键控制，电脑、电视轻松摸鱼</li>
                                 </ul>
                             </div>
 
@@ -516,16 +513,17 @@
                                 </ul>
                                 <div class="flex justify-center space-x-3 mt-4">
                                     <a href="weixin://profile/gh_86f7c0a73738">
-                                    <div class="flex flex-col items-center">
-                                        <img src="/wechat.webp" alt="微信" class="w-24 h-24 object-cover rounded">
-                                        <span class="text-[10px] text-gray-400 mt-1">微信</span>
-                                    </div>
+                                        <div class="flex flex-col items-center">
+                                            <img src="wechat.webp" alt="微信" class="w-24 h-24 object-cover rounded">
+                                            <span class="text-[10px] text-gray-400 mt-1">微信</span>
+                                        </div>
                                     </a>
-                                    <a href="alipays://platformapi/startapp?saId=10000007&clientVersion=3.7.0.0718&qrcode=https%3A%2F%2Fqr.alipay.com%2Ffkx15248wilbz2ddz96og40">
-                                    <div class="flex flex-col items-center">
-                                        <img src="/alipay.webp" alt="支付宝" class="w-24 h-24 object-cover rounded">
-                                        <span class="text-[10px] text-gray-400 mt-1">支付宝</span>
-                                    </div>
+                                    <a
+                                        href="alipays://platformapi/startapp?saId=10000007&clientVersion=3.7.0.0718&qrcode=https%3A%2F%2Fqr.alipay.com%2Ffkx15248wilbz2ddz96og40">
+                                        <div class="flex flex-col items-center">
+                                            <img src="alipay.webp" alt="支付宝" class="w-24 h-24 object-cover rounded">
+                                            <span class="text-[10px] text-gray-400 mt-1">支付宝</span>
+                                        </div>
                                     </a>
                                 </div>
                             </div>
