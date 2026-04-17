@@ -598,16 +598,29 @@
 
                 this.state.isAutoplay = this.config.autoplay !== false;
 
+                // Sync UI based on loaded stated
+                if (this.dom.muteBtn) {
+                    const iconName = this.state.isMuted ? 'volume-x' : 'volume-2';
+                    const iconColor = this.state.isMuted ? 'text-secondary' : 'stroke-white';
+                    this.dom.muteBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${iconName}" class="${iconColor} w-6 h-6 drop-shadow-md"></i></div>`;
+                }
+                if (this.dom.scaleBtn) {
+                    this.dom.scaleBtn.innerHTML = `<div class="w-12 h-12 flex items-center justify-center"><i data-lucide="${this.state.isScaleFill ? 'maximize-2' : 'minimize-2'}" class="stroke-white w-6 h-6 drop-shadow-md"></i></div>`;
+                }
+
                 const viewBtn = this.dom.viewModeBtn;
                 viewBtn.innerHTML = `<i data-lucide="gallery-vertical" class="stroke-current w-5 h-5"></i>`;
 
                 const playBtn = this.dom.playModeBtn;
-                playBtn.innerHTML = `<i data-lucide="${this.state.isAutoplay ? 'repeat' : 'repeat-1'}" class="stroke-current w-5 h-5"></i>`;
+                // If random mode is saved, show shuffle icon. Otherwise show repeat/repeat-1 based on isAutoplay
+                const isSeq = this.state.playMode === 'sequence';
+                const playIcon = isSeq ? (this.state.isAutoplay ? 'repeat' : 'repeat-1') : 'shuffle';
+                playBtn.innerHTML = `<i data-lucide="${playIcon}" class="stroke-current w-5 h-5"></i>`;
 
                 lucide.createIcons();
 
                 if (this.config.server && this.config.token) {
-                    this.fetchVideos();
+                    this.fetchVideos(this.state.currentLibraryId);
                 } else {
                     setTimeout(() => this.toggleModal('profilePage', true), 500);
                 }
@@ -635,6 +648,22 @@
                 this.config.useStatic = localStorage.getItem('emby_static') !== 'false';
                 this.config.autoplay = localStorage.getItem('emby_autoplay') !== 'false';
                 this.config.deleteMode = localStorage.getItem('emby_delete_mode') === 'true';
+
+                const savedScale = localStorage.getItem('emby_is_scale_fill');
+                if (savedScale !== null) this.state.isScaleFill = savedScale === 'true';
+
+                const savedMute = localStorage.getItem('emby_is_muted');
+                if (savedMute !== null) this.state.isMuted = savedMute === 'true';
+
+                const savedPlayMode = localStorage.getItem('emby_play_mode');
+                if (savedPlayMode !== null) this.state.playMode = savedPlayMode;
+
+                const savedLibId = localStorage.getItem('emby_lib_id');
+                const savedLibType = localStorage.getItem('emby_lib_type');
+                if (savedLibId) {
+                    this.state.currentLibraryId = savedLibId;
+                    this.state.currentLibraryType = savedLibType || 'library';
+                }
 
                 if (this.dom.configServer) this.dom.configServer.value = this.config.server;
                 if (this.dom.configUser) this.dom.configUser.value = this.config.user;
@@ -1592,6 +1621,8 @@
                             div.onclick = () => {
                                 this.state.currentLibraryId = pl.Id;
                                 this.state.currentLibraryType = 'playlist';
+                                localStorage.setItem('emby_lib_id', pl.Id);
+                                localStorage.setItem('emby_lib_type', 'playlist');
                                 this.state.currentTab = 'home';
                                 this.updateTabHighlight();
                                 this.fetchVideos(pl.Id);
@@ -1616,6 +1647,8 @@
                             div.onclick = () => {
                                 this.state.currentLibraryId = lib.Id;
                                 this.state.currentLibraryType = 'library';
+                                localStorage.setItem('emby_lib_id', lib.Id);
+                                localStorage.setItem('emby_lib_type', 'library');
                                 this.state.currentTab = 'home';
                                 this.updateTabHighlight();
                                 this.fetchVideos(lib.Id);
@@ -1781,6 +1814,7 @@
             togglePlayMode() {
                 const isSeq = this.state.playMode === 'sequence';
                 this.state.playMode = isSeq ? 'random' : 'sequence';
+                localStorage.setItem('emby_play_mode', this.state.playMode);
 
                 const btn = this.dom.playModeBtn;
                 btn.innerHTML = `<i data-lucide="${isSeq ? 'shuffle' : 'repeat'}" class="stroke-current w-5 h-5"></i>`;
@@ -1848,6 +1882,7 @@
 
             toggleScaleMode() {
                 this.state.isScaleFill = !this.state.isScaleFill;
+                localStorage.setItem('emby_is_scale_fill', this.state.isScaleFill);
                 const videos = document.querySelectorAll('.video-fullscreen');
                 videos.forEach((v, index) => {
                     v.classList.remove('object-cover', 'object-contain');
@@ -1991,6 +2026,7 @@
                 this.dom.muteBtn.onclick = (e) => {
                     e.stopPropagation();
                     this.state.isMuted = !this.state.isMuted;
+                    localStorage.setItem('emby_is_muted', this.state.isMuted);
 
                     const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
                     const v = document.getElementById(`video-p${slideIdx}`);
