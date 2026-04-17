@@ -348,7 +348,7 @@
                             <div class="flex items-center">
                                 <h3 class="text-white font-bold text-2xl tracking-tight">📱 EmbyX</h3>
                                 <span
-                                    class="ml-2 px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full border border-primary/30">v1.0</span>
+                                    class="ml-2 px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded-full border border-primary/30">v1.1</span>
                             </div>
 
                             <div>
@@ -683,7 +683,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.0"`
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
                         },
                         body: JSON.stringify({ Username: user, Pw: pwd })
                     });
@@ -792,7 +792,7 @@
                     const PAGE_SIZE = 99;
                     // const MAX_GRID_VIDEOS = 1000;
 
-                    let url = `${server}/emby/Users/${userId}/Items?api_key=${token}&Recursive=true&IncludeItemTypes=Video&Limit=${PAGE_SIZE}&StartIndex=${this.state.startIndex || 0}&Fields=Overview,Path,RunTimeTicks,MediaSources`;
+                    let url = `${server}/emby/Users/${userId}/Items?api_key=${token}&Recursive=true&IncludeItemTypes=Movie,Episode,Video&Limit=${PAGE_SIZE}&StartIndex=${this.state.startIndex || 0}&Fields=Overview,Path,RunTimeTicks,MediaSources`;
 
                     if (ids) {
                         url += `&Ids=${ids}`;
@@ -808,7 +808,11 @@
                         url += `&SortBy=DateCreated&SortOrder=Descending`;
                     }
 
-                    const res = await fetch(url);
+                    const res = await fetch(url, {
+                        headers: {
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                        }
+                    });
                     if (!res.ok) {
                         throw new Error(`Server Error: ${res.status}`);
                     }
@@ -1457,10 +1461,18 @@
                 try {
                     const userId = this.config.userId;
 
-                    const playlistsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Items?Recursive=true&IncludeItemTypes=Playlist&api_key=${this.config.token}`);
+                    const playlistsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Items?Recursive=true&IncludeItemTypes=Playlist&api_key=${this.config.token}`, {
+                        headers: {
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                        }
+                    });
                     const playlistsData = await playlistsRes.json();
 
-                    const viewsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Views?api_key=${this.config.token}`);
+                    const viewsRes = await fetch(`${this.config.server}/emby/Users/${userId}/Views?api_key=${this.config.token}`, {
+                        headers: {
+                            'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                        }
+                    });
                     const viewsDataRaw = viewsRes.ok ? await viewsRes.json() : { Items: [] };
 
                     localStorage.setItem('emby_views_cache', JSON.stringify({ playlists: playlistsData, views: viewsDataRaw }));
