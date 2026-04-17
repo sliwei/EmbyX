@@ -55,7 +55,7 @@
             }
             
             .slide-item {
-                @apply absolute top-0 left-0 w-full h-full z-10;
+                @apply absolute top-0 left-0 w-full h-full z-10 overflow-hidden;
             }
             
             .play-pause-btn {
@@ -411,8 +411,10 @@
                             <div>
                                 <h4 class="text-gray-300">🧩 Tips & Tricks</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs mt-2">
-                                    <li>Best Practice: < 1,000 items per library</li>
-                                    <li>PWA: 📲 Add to Home Screen or Install as App</li>
+                                    <li>Faster Importing: Use "Home Video" library type.</li>
+                                    <li>Smoother Loading: Limit libraries to < 1,000 videos.</li>
+                                    <li>Easier Managing: Use multiple libraries and playlists.</li>
+                                    <li>PWA Support: Add to Home Screen or Install as App. 📲</li>
                                 </ul>
                             </div>
 
@@ -499,17 +501,20 @@
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
                                     <a href="https://x.com/juneix_tse" target="_blank"
                                         class="flex items-center justify-center text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors border border-white/20 text-[10px] whitespace-nowrap">
-                                        <i data-lucide="twitter"
-                                            class="w-3.5 h-3.5 mr-1.5 grayscale brightness-200"></i> X • Follow</a>
+                                        <img src="https://cdn.simpleicons.org/x/white" class="w-3.5 h-3.5 mr-1.5"
+                                            alt="X" /> Twitter • Follow</a>
                                     <a href="https://t.me/juneix_en" target="_blank"
                                         class="flex items-center justify-center text-[#26A5E4] bg-[#26A5E4]/10 hover:bg-[#26A5E4]/20 px-3 py-1.5 rounded-full transition-colors border border-[#26A5E4]/20 text-[10px] whitespace-nowrap">
-                                        <i data-lucide="send" class="w-3.5 h-3.5 mr-1.5"></i> Telegram • Channel</a>
+                                        <img src="https://cdn.simpleicons.org/telegram/26A5E4"
+                                            class="w-3.5 h-3.5 mr-1.5" alt="Telegram" /> Telegram • Channel</a>
                                     <a href="https://ko-fi.com/juneixtse" target="_blank"
-                                        class="flex items-center justify-center text-[#FF5E5B] bg-[#FF5E5B]/10 hover:bg-[#FF5E5B]/20 px-3 py-1.5 rounded-full transition-colors border border-[#FF5E5B]/20 text-[10px] whitespace-nowrap">
-                                        <i data-lucide="coffee" class="w-3.5 h-3.5 mr-1.5"></i> Ko-fi • Support</a>
+                                        class="flex items-center justify-center text-[#FF6433] bg-[#FF5E5B]/10 hover:bg-[#FF5E5B]/20 px-3 py-1.5 rounded-full transition-colors border border-[#FF5E5B]/20 text-[10px] whitespace-nowrap">
+                                        <img src="https://cdn.simpleicons.org/kofi/FF6433" class="w-3.5 h-3.5 mr-1.5"
+                                            alt="Ko-fi" /> Ko-fi • Support</a>
                                     <a href="https://github.com/juneix/embyx" target="_blank"
                                         class="flex items-center justify-center text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors border border-white/20 text-[10px] whitespace-nowrap active:scale-95">
-                                        <i data-lucide="github" class="w-3.5 h-3.5 mr-1.5"></i> GitHub • Source</a>
+                                        <img src="https://cdn.simpleicons.org/github/white" class="w-3.5 h-3.5 mr-1.5"
+                                            alt="GitHub" /> GitHub • Source</a>
                                 </div>
                             </div>
 
@@ -562,6 +567,8 @@
                     currentLibraryId: null,
                     isScaleFill: true,
                     isMuted: false,
+                    lastReportTime: 0,
+                    playSessionId: null,
                     originalVideos: []
                 };
 
@@ -1183,6 +1190,7 @@
             loadVideo(index) {
                 if (this.state.viewMode !== 'stream') return;
 
+                this.state.playSessionId = 'ex_' + Date.now().toString(16);
                 this.renderBuffer();
 
                 const videoData = this.state.videos[this.state.currentIndex];
@@ -1214,6 +1222,7 @@
                     clearTimeout(this._waitingTimer);
                     this.toggleLoading(false);
                     videoEl.style.opacity = '1';
+                    this.reportPlayback('playing', videoEl);
                 };
 
                 videoEl.oncanplay = () => {
@@ -1234,10 +1243,13 @@
                         this.dom.progressLine.style.width = `${pct}%`;
                         this.dom.currentTime.textContent = this.formatTime(videoEl.currentTime);
                         this.dom.totalTime.textContent = this.formatTime(videoEl.duration);
+                        this.reportPlayback('progress', videoEl);
                     }
                 };
+                videoEl.onpause = () => this.reportPlayback('progress', videoEl);
 
                 videoEl.onended = () => {
+                    this.reportPlayback('stopped', videoEl);
                     if (this.state.viewMode === 'stream' && this.state.isAutoplay) {
                         this.nextVideo();
                     }
@@ -1376,7 +1388,10 @@
             switchSlide(newIndex, direction) {
                 const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
                 const curV = document.getElementById(`video-p${slideIdx}`);
-                if (curV) curV.pause();
+                if (curV) {
+                    curV.pause();
+                    this.reportPlayback('stopped', curV);
+                }
 
                 if (this.dom.slides) {
                     const destSlideIdx = (newIndex % 3 + 3) % 3;
@@ -1399,6 +1414,71 @@
                 });
             }
 
+            reportPlayback(event, videoEl) {
+                if (!this.config.server || !this.config.token || this.state.videos.length === 0) return;
+
+                const now = Date.now();
+                if (event === 'progress' && now - (this.state.lastReportTime || 0) < 5000) return;
+                if (event === 'progress') this.state.lastReportTime = now;
+
+                const videoData = this.state.videos[this.state.currentIndex];
+                if (!videoData || !videoEl) return;
+
+                // Emby Fix: 1. Map standard names 2. Add MediaSourceId 3. Report Capabilities
+                const eventMap = { 'playing': 'TimeUpdate', 'progress': 'TimeUpdate', 'stopped': 'Stopped' };
+                const eventName = videoEl.paused ? 'Pause' : (eventMap[event] || 'TimeUpdate');
+                const mediaSourceId = videoData.MediaSources?.[0]?.Id || '';
+
+                if (event === 'playing') {
+                    this.reportCapabilities();
+                }
+
+                const ticks = Math.floor(videoEl.currentTime * 10000000);
+
+                let endpoint = '/Sessions/Playing';
+                if (event === 'progress') endpoint = '/Sessions/Playing/Progress';
+                if (event === 'stopped') endpoint = '/Sessions/Playing/Stopped';
+
+                const payload = {
+                    ItemId: videoData.Id,
+                    PositionTicks: ticks,
+                    IsPaused: videoEl.paused || event === 'stopped',
+                    IsMuted: videoEl.muted,
+                    VolumeLevel: Math.floor(videoEl.volume * 100),
+                    PlayMethod: this.config.useStatic ? 'DirectPlay' : 'Transcode',
+                    EventName: eventName,
+                    CanSeek: true,
+                    PlaySessionId: this.state.playSessionId,
+                    QueueableMediaTypes: ["Video"]
+                };
+                if (mediaSourceId) payload.MediaSourceId = mediaSourceId;
+
+                fetch(`${this.config.server}/emby${endpoint}?api_key=${this.config.token}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                    },
+                    body: JSON.stringify(payload)
+                }).catch(() => { });
+            }
+
+            reportCapabilities() {
+                const { server, token } = this.config;
+                if (!server || !token) return;
+                fetch(`${server}/emby/Sessions/Capabilities/Full?api_key=${token}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                    },
+                    body: JSON.stringify({
+                        PlayableMediaTypes: ["Video"],
+                        SupportsMediaControl: true,
+                        SupportsPersistentConnections: false
+                    })
+                }).catch(() => { });
+            }
 
             getVideoSrc(id, mediaItem) {
                 const { server, token, useStatic } = this.config;

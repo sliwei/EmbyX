@@ -59,7 +59,7 @@
             
             /* 单个视频卡片 */
             .slide-item {
-                @apply absolute top-0 left-0 w-full h-full z-10;
+                @apply absolute top-0 left-0 w-full h-full z-10 overflow-hidden;
             }
             
             /* 播放/暂停按钮动画 - 修复：提高 z-index 确保在视频之上 */
@@ -299,7 +299,7 @@
                         <div class="space-y-4 bg-gray-800/40 p-4 rounded-lg border border-gray-700/50">
                             <div>
                                 <label class="text-gray-400 text-xs block mb-1.5">服务器地址</label>
-                                <input type="text" id="configServer" placeholder="HTTP 访问可反代或自建 EmbyX"
+                                <input type="text" id="configServer" placeholder="HTTP 访问请反代或自建 EmbyX"
                                     class="w-full bg-gray-900 text-white text-sm rounded px-3 py-2.5 outline-none border border-gray-700 focus:border-primary transition-colors focusable-item">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
@@ -385,7 +385,7 @@
                                 <h4 class="text-gray-300">🔮 播放性能</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs mt-2">
                                     <li>原生 HTML5 播放器，新设备体验最佳</li>
-                                    <li>老设备需服务器转码，<del>不如放到**上回收(没打钱</del>😂</li>
+                                    <li>老设备需服务器转码，<del>不如放到**上回收(没打钱</del> 😂</li>
                                 </ul>
                                 <div class="bg-black/40 rounded-lg overflow-hidden border border-gray-700/50 mt-3">
                                     <table class="w-full text-center text-[11px] leading-tight border-collapse">
@@ -424,8 +424,10 @@
                             <div>
                                 <h4 class="text-gray-300">🧩 使用技巧</h4>
                                 <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs mt-2">
-                                    <li>配置建议：每个媒体库 < 1000 个视频</li>
-                                    <li>PWA应用：📲 添加到主屏幕/作为应用安装</li>
+                                    <li>入库更快：媒体库类型选「家庭视频」</li>
+                                    <li>加载更顺：每个媒体库 < 1000 个视频</li>
+                                    <li>管理更爽：使用多个媒体库和播放列表</li>
+                                    <li>PWA 应用：添加到主屏幕/作为应用安装 📲</li>
                                 </ul>
                             </div>
 
@@ -506,16 +508,20 @@
                                 <div class="grid grid-cols-2 gap-2 mt-3">
                                     <a href="https://space.bilibili.com/765334/" target="_blank"
                                         class="flex items-center justify-center text-[#FB7299] bg-[#FB7299]/10 hover:bg-[#FB7299]/20 px-3 py-1.5 rounded-full transition-colors border border-[#FB7299]/20 text-[10px] whitespace-nowrap active:scale-95">
-                                        <i data-lucide="tv-2" class="w-3.5 h-3.5 mr-1.5"></i> B 站·教程</a>
+                                        <img src="https://cdn.simpleicons.org/bilibili/FB7299"
+                                            class="w-3.5 h-3.5 mr-1.5" alt="Bilibili" /> B 站·教程</a>
                                     <a href="https://xhslink.com/m/XSWtx7YRfI" target="_blank"
                                         class="flex items-center justify-center text-[#FF2442] bg-[#FF2442]/10 hover:bg-[#FF2442]/20 px-3 py-1.5 rounded-full transition-colors border border-[#FF2442]/20 text-[10px] whitespace-nowrap active:scale-95">
-                                        <i data-lucide="book-open" class="w-3.5 h-3.5 mr-1.5"></i> 小红书·攻略</a>
+                                        <img src="https://cdn.simpleicons.org/xiaohongshu/FF2442"
+                                            class="w-3.5 h-3.5 mr-1.5" alt="Xiaohongshu" /> 小红书·攻略</a>
                                     <a href="https://qm.qq.com/q/ZzOD5Qbhce" target="_blank"
                                         class="flex items-center justify-center text-[#12B7F5] bg-[#12B7F5]/10 hover:bg-[#12B7F5]/20 px-3 py-1.5 rounded-full transition-colors border border-[#12B7F5]/20 text-[10px] whitespace-nowrap active:scale-95">
-                                        <i data-lucide="message-circle" class="w-3.5 h-3.5 mr-1.5"></i> QQ 群·催更</a>
+                                        <img src="https://cdn.simpleicons.org/qq/12B7F5" class="w-3.5 h-3.5 mr-1.5"
+                                            alt="QQ" /> QQ 群·催更</a>
                                     <a href="https://github.com/juneix/embyx" target="_blank"
                                         class="flex items-center justify-center text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors border border-white/20 text-[10px] whitespace-nowrap active:scale-95">
-                                        <i data-lucide="github" class="w-3.5 h-3.5 mr-1.5"></i> GitHub · 开源</a>
+                                        <img src="https://cdn.simpleicons.org/github/white" class="w-3.5 h-3.5 mr-1.5"
+                                            alt="GitHub" /> GitHub · 开源</a>
                                 </div>
                                 <!-- 打赏区 -->
                                 <p class="text-gray-400 text-xs mt-4 mb-2">☕ 打赏鼓励，支持我开发更多有趣应用～</p>
@@ -589,6 +595,8 @@
                     currentLibraryId: null,
                     isScaleFill: true,
                     isMuted: false,
+                    lastReportTime: 0,
+                    playSessionId: null,
                     originalVideos: []  // 随机模式下保存原始顺序列表
                 };
 
@@ -1274,6 +1282,7 @@
             loadVideo(index) {
                 if (this.state.viewMode !== 'stream') return;
 
+                this.state.playSessionId = 'ex_' + Date.now().toString(16); // 每次加载新视频生成唯一会话 ID
                 this.renderBuffer(); // 确保 DOM 就位
 
                 const videoData = this.state.videos[this.state.currentIndex];
@@ -1309,6 +1318,7 @@
                     this.toggleLoading(false);
                     // 确保播放时图层可见，应对部分系统/浏览器事件次序差异
                     videoEl.style.opacity = '1';
+                    this.reportPlayback('playing', videoEl);
                 };
 
                 // 《修复点①》 canplay 时视频淡入覆盖封面
@@ -1331,10 +1341,13 @@
                         this.dom.progressLine.style.width = `${pct}%`;
                         this.dom.currentTime.textContent = this.formatTime(videoEl.currentTime);
                         this.dom.totalTime.textContent = this.formatTime(videoEl.duration);
+                        this.reportPlayback('progress', videoEl);
                     }
                 };
+                videoEl.onpause = () => this.reportPlayback('progress', videoEl);
 
                 videoEl.onended = () => {
+                    this.reportPlayback('stopped', videoEl);
                     if (this.state.viewMode === 'stream' && this.state.isAutoplay) {
                         this.nextVideo();
                     }
@@ -1481,7 +1494,10 @@
             switchSlide(newIndex, direction) {
                 const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
                 const curV = document.getElementById(`video-p${slideIdx}`);
-                if (curV) curV.pause();
+                if (curV) {
+                    curV.pause();
+                    this.reportPlayback('stopped', curV);
+                }
 
                 // 【动画修复】先同步预就位目标 slide，再同步触发 container 位移动画
                 // 这样浏览器能在同一帧内确认 slide 位置，动画由 GPU 合成层完成，不会闪现
@@ -1507,6 +1523,74 @@
                     this.loadVideo(newIndex);
                     this.playVideo(newIndex);
                 });
+            }
+
+            reportPlayback(event, videoEl) {
+                if (!this.config.server || !this.config.token || this.state.videos.length === 0) return;
+
+                const now = Date.now();
+                // 进度汇报增加 5s 节流，避免频繁请求，playing 和 stopped 立即执行
+                if (event === 'progress' && now - (this.state.lastReportTime || 0) < 5000) return;
+                if (event === 'progress') this.state.lastReportTime = now;
+
+                const videoData = this.state.videos[this.state.currentIndex];
+                if (!videoData || !videoEl) return;
+
+                // Emby 识别修正：1. 映射标准事件名 2. 补全 MediaSourceId 3. 首次播放进行能力上报
+                const eventMap = { 'playing': 'TimeUpdate', 'progress': 'TimeUpdate', 'stopped': 'Stopped' };
+                const eventName = videoEl.paused ? 'Pause' : (eventMap[event] || 'TimeUpdate');
+                const mediaSourceId = videoData.MediaSources?.[0]?.Id || '';
+
+                if (event === 'playing') {
+                    this.reportCapabilities();
+                }
+
+                const ticks = Math.floor(videoEl.currentTime * 10000000);
+                const totalTicks = Math.floor(videoEl.duration * 10000000) || 0;
+
+                let endpoint = '/Sessions/Playing';
+                if (event === 'progress') endpoint = '/Sessions/Playing/Progress';
+                if (event === 'stopped') endpoint = '/Sessions/Playing/Stopped';
+
+                const payload = {
+                    ItemId: videoData.Id,
+                    PositionTicks: ticks,
+                    IsPaused: videoEl.paused || event === 'stopped',
+                    IsMuted: videoEl.muted,
+                    VolumeLevel: Math.floor(videoEl.volume * 100),
+                    PlayMethod: this.config.useStatic ? 'DirectPlay' : 'Transcode',
+                    EventName: eventName,
+                    CanSeek: true,
+                    PlaySessionId: this.state.playSessionId,
+                    QueueableMediaTypes: ["Video"]
+                };
+                if (mediaSourceId) payload.MediaSourceId = mediaSourceId;
+
+                fetch(`${this.config.server}/emby${endpoint}?api_key=${this.config.token}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                    },
+                    body: JSON.stringify(payload)
+                }).catch(() => { });
+            }
+
+            reportCapabilities() {
+                const { server, token } = this.config;
+                if (!server || !token) return;
+                fetch(`${server}/emby/Sessions/Capabilities/Full?api_key=${token}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Emby-Authorization': `Emby Client="EmbyX", Device="Web", DeviceId="EmbyX-Device", Version="1.1"`
+                    },
+                    body: JSON.stringify({
+                        PlayableMediaTypes: ["Video"],
+                        SupportsMediaControl: true,
+                        SupportsPersistentConnections: false
+                    })
+                }).catch(() => { });
             }
 
             // --- 辅助功能 ---
