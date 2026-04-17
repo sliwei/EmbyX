@@ -1546,7 +1546,6 @@
                 }
 
                 const ticks = Math.floor(videoEl.currentTime * 10000000);
-                const totalTicks = Math.floor(videoEl.duration * 10000000) || 0;
 
                 let endpoint = '/Sessions/Playing';
                 if (event === 'progress') endpoint = '/Sessions/Playing/Progress';
