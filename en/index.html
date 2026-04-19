@@ -1762,28 +1762,52 @@
                 lucide.createIcons();
             }
 
-            executeDelete() {
+            async executeDelete() {
                 const item = this.state.videos[this.state.currentIndex];
                 if (!item) return;
 
-                fetch(`${this.config.server}/emby/Items/${item.Id}?api_key=${this.config.token}`, {
-                    method: 'DELETE'
-                }).then(() => {
+                try {
+                    // Note: Emby DELETE API requires admin account; regular users get 403
+                    // Must check res.ok, otherwise 403/404 are silently treated as success
+                    const res = await fetch(`${this.config.server}/emby/Items/${item.Id}?api_key=${this.config.token}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!res.ok) {
+                        if (res.status === 403) {
+                            this.showToast('❌ No permission. Use an admin account');
+                            this.toggleModal('deleteConfirmModal', false);
+                            return;
+                        }
+                        if (res.status !== 404) {
+                            this.showToast(`❌ Delete failed (${res.status})`);
+                            this.toggleModal('deleteConfirmModal', false);
+                            return;
+                        }
+                        // 404 means already deleted — still remove from list
+                    }
+
                     this.showToast('✅ Deleted');
                     this.state.videos.splice(this.state.currentIndex, 1);
                     this.toggleModal('deleteConfirmModal', false);
+
                     if (this.state.viewMode === 'grid') {
                         this.renderGridView();
                     } else {
                         if (this.state.currentIndex >= this.state.videos.length) {
                             this.state.currentIndex = Math.max(0, this.state.videos.length - 1);
                         }
+                        // Fix: renderSlides only rebuilds DOM; must call loadVideo+playVideo to resume playback
                         this.renderSlides();
+                        if (this.state.videos.length > 0) {
+                            this.loadVideo(this.state.currentIndex);
+                            this.playVideo(this.state.currentIndex);
+                        }
                     }
-                }).catch(() => {
-                    this.showToast('❌ Delete failed');
+                } catch (e) {
+                    this.showToast('❌ Delete failed: network error');
                     this.toggleModal('deleteConfirmModal', false);
-                });
+                }
             }
 
             showInterfaceTemp() {
