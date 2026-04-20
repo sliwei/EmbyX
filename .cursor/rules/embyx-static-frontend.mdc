@@ -1,0 +1,13 @@
+---
+description: 大体积 HTML / PWA / SW 编辑约定
+globs:
+  - "zh/**"
+alwaysApply: false
+---
+
+# 静态前端与 PWA
+
+- **结构**：单文件 `index.html` 体量很大；优先在现有 `@layer`、`tailwind.config` 内联块与既有 DOM/脚本模式中增量修改，除非明确要求拆分或重构架构。
+- **样式**：沿用 `primary`（Emby 绿）、`secondary`（抖音红）与现有 utilities；注意 `100dvh` / `standalone` 下 `100vh` 等与全屏、安全区相关的既有逻辑。
+- **资源**：`manifest.json`、`sw.js` 与页面路径保持同目录一致；修改缓存策略时考虑版本与破坏性。
+- **无障碍与交互**：保留遥控器焦点（如 `.focusable-item`）与快捷键行为的一致性。

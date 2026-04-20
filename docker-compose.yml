@@ -1,9 +1,22 @@
 services:
   embyx:
-    image: ghcr.io/juneix/embyx:latest
+    # 飞牛 Intel：使用已推送的 amd64 镜像（本地构建推送见 scripts/docker-push-aliyun.sh）
+    image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:latest
     container_name: embyx
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "8090:8090"
     environment:
-      - APP_LANG=zh # zh (中文), en (English)
-      - APP_PORT=8090 # 访问端口 (Access Port)
+      PORT: "8090"
+      MEDIA_ROOTS: "/media"
+      DB_PATH: "/data/app.db"
+      CACHE_DIR: "/data/cache"
+      FFMPEG_CONCURRENCY: "3"
+      SCAN_INTERVAL_MS: "600000"
+    volumes:
+      - embyx_data:/data
+      # 将飞牛/NAS 上的目录挂载到容器 /media（可挂载多个宿主路径需同步改 MEDIA_ROOTS）
+      # - /实际路径/短视频库:/media:ro
+
+volumes:
+  embyx_data:

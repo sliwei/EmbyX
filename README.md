@@ -74,7 +74,6 @@ If EmbyX makes your digital life easier, please `star it on GitHub ⭐️`, or s
 ```
 embyx/
 ├── zh/               # Chinese Version
-├── en/               # English Version
 ├── README.md         # English Documentation (Default)
 ├── README_zh.md      # Chinese Documentation
 ├── Dockerfile        # Docker Image Build File
@@ -88,7 +87,7 @@ embyx/
 
 ### Option 1: Direct File Hosting (Recommended)
 
-Simply put all files from `en/` folder into your web server (Nginx, Apache, etc.)
+Simply put all files from `zh/` folder into your web server (Nginx, Apache, etc.)
 
 ### Option 2: Docker Deployment
 
@@ -103,7 +102,6 @@ Don't want to mess with the environment? Just use Docker. Recommended GHCR for u
 docker run -d \
   --name embyx \
   --network host \
-  -e APP_LANG=en \
   -e APP_PORT=8090 \
   ghcr.io/juneix/embyx
 ```
@@ -117,7 +115,6 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - APP_LANG=en # English Version
       - APP_PORT=8090 # Access Port
 ```
 

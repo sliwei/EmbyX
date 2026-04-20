@@ -82,71 +82,11 @@ jobs:
           name: embyx-zh
           path: EmbyX-zh.apk
 
-  # ── 英文版 APK 构建 ──────────────────────────────────────────────────────────
-  build-android-en:
-    name: Build EmbyX-en APK
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      # 动态生成英文版 capacitor.config.json（webDir 指向 en/ 目录）
-      - name: Create capacitor.config.json (en)
-        run: |
-          cat > capacitor.config.json << 'EOF'
-          {
-            "appId": "juneix.embyx",
-            "appName": "EmbyX",
-            "webDir": "en",
-            "server": {
-              "androidScheme": "http",
-              "cleartext": true
-            }
-          }
-          EOF
-
-      - name: Install Capacitor dependencies
-        run: npm install
-
-      - name: Add & Sync Android Platform
-        run: |
-          npx cap add android
-          npx cap sync android
-
-      # 运行补丁脚本：替换图标、注册屏保、添加全屏模式
-      - name: Patch Android Project (en)
-        run: python .github/patch_android.py --lang en
-
-      - name: Build Debug APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: Rename to EmbyX-en.apk
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk EmbyX-en.apk
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: embyx-en
-          path: EmbyX-en.apk
-
   # ── 发布 Release ─────────────────────────────────────────────────────────────
   # 当推送到 main 分支、打 v* 标签或手动触发时执行
   release:
     name: Create GitHub Release
-    needs: [build-android-zh, build-android-en]
+    needs: [build-android-zh]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
     steps:
@@ -157,7 +97,6 @@ jobs:
         run: |
           ls -R
           test -f "embyx-zh/EmbyX-zh.apk"
-          test -f "embyx-en/EmbyX-en.apk"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -170,6 +109,5 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             embyx-zh/EmbyX-zh.apk
-            embyx-en/EmbyX-en.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

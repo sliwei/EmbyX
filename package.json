@@ -4,7 +4,8 @@
   "description": "Emby 短视频播放器",
   "main": "index.js",
   "scripts": {
-    "build:android": "npx cap sync android"
+    "build:android": "npx cap sync android",
+    "start:local": "node server/index.js"
   },
   "dependencies": {
     "@capacitor/android": "^5.0.0",

@@ -4,17 +4,17 @@ import sys
 import shutil
 import argparse
 
-# 根据命令行参数决定打包中文版还是英文版
-# 用法: python patch_android.py --lang zh 或 --lang en
+# 根据命令行参数决定资源目录（当前仅 zh）
+# 用法: python patch_android.py --lang zh
 parser = argparse.ArgumentParser()
-parser.add_argument("--lang", choices=["zh", "en"], default="zh", help="打包语言版本")
+parser.add_argument("--lang", choices=["zh"], default="zh", help="打包语言版本")
 args = parser.parse_args()
 
 LANG = args.lang
 PKG_NAME = "juneix.embyx"
 PKG_PATH = PKG_NAME.replace(".", "/")  # juneix/embyx
 APP_NAME = "EmbyX"
-ICON_SRC = f"{LANG}/icon.png"          # zh/icon.png 或 en/icon.png
+ICON_SRC = f"{LANG}/icon.png"          # zh/icon.png
 
 # ── 0. 从 HTML 徽章提取版本号 ─────────────────────────────────────────────────
 # HTML 中的版本徽章格式为 ">v1.1<"，两个版本的徽章内容保持一致，统一读 zh/index.html

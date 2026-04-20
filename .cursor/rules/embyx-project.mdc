@@ -1,0 +1,11 @@
+---
+description: EmbyX 仓库结构与协作约定（全局）
+alwaysApply: true
+---
+
+# EmbyX 项目上下文
+
+- **定位**：面向 Emby / Jellyfin 的 Web 原生短视频式播放器；数据本地、PWA、键鼠与 TV 遥控适配。
+- **目录**：`zh/` 为静态站点（`index.html`、`sw.js`、`manifest.json`）；根目录 `Dockerfile`、`nginx.conf`、`entrypoint.sh` 用于部署；`.github/workflows` 负责发布与镜像。
+- **依赖**：运行时以 CDN（Tailwind、Lucide）与页内脚本为主；`package.json` 主要用于 `@capacitor/*` 的 Android 同步（`build:android`），勿随意添加与静态页无关的依赖。
+- **修改原则**：改动聚焦需求；避免无关重构；播放、鉴权与 Emby API 相关变更需保守验证。
