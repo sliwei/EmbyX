@@ -1,0 +1,9 @@
+# 宿主 node_modules（含 darwin/arm64 预编译）若被打进镜像会覆盖镜像内 RUN npm install，
+# better-sqlite3 将报 invalid ELF header / ERR_DLOPEN_FAILED。
+node_modules
+server/node_modules
+
+# 本地运行产生的数据不应进入镜像
+server/data
+
+.git

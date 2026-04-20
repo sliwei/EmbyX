@@ -29,9 +29,10 @@ RUN set -eux; \
 
 WORKDIR /app
 
-COPY server/package.json ./
-RUN npm install --omit=dev
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev
 
+# 依赖 .dockerignore 排除 server/node_modules，否则会覆盖上一行的 Linux 原生模块
 COPY server/ ./
 COPY zh/ ./zh-public/
 
