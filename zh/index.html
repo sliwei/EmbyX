@@ -91,8 +91,16 @@
             .profile-layer.active {
                 @apply translate-y-0;
             }
+            /* 不要用 h-full：外层为扩大触控区会变高，进度条厚度由节点上的 h-1 决定 */
             .progress-line {
-                @apply h-full bg-white transition-[width] duration-100 ease-linear;
+                @apply bg-white rounded-full;
+            }
+            /* 播放进度平滑；拖拽时由 JS 加 progress-scrubbing 关闭过渡避免跟手滞后 */
+            #progressBarContainer:not(.progress-scrubbing) .progress-line {
+                transition: width 80ms linear;
+            }
+            #progressBarContainer:not(.progress-scrubbing) #progressThumb {
+                transition: left 80ms linear;
             }
             .nav-btn {
                 @apply relative flex flex-col items-center justify-center w-1/4 h-full cursor-pointer transition-colors duration-300 z-10;
@@ -146,7 +154,7 @@
 
             <div class="flex flex-col items-center cursor-pointer active:scale-90 transition-transform" id="scaleBtn">
                 <div class="w-8 h-8 flex items-center justify-center">
-                    <i data-lucide="maximize-2" class="stroke-white w-4 h-4 drop-shadow-md"></i>
+                    <i data-lucide="minimize-2" class="stroke-white w-4 h-4 drop-shadow-md"></i>
                 </div>
             </div>
 
@@ -221,8 +229,24 @@
                     请点击右下角“我的”进行服务器配置</p>
             </div>
 
-            <div class="relative h-0.5 bg-white/30 cursor-pointer pointer-events-auto mb-0.5" id="progressBarContainer">
-                <div id="progressLine" class="progress-line w-0"></div>
+            <div class="flex items-center gap-1.5 mb-0.5 pointer-events-auto">
+                <div id="playPauseBtn"
+                    class="flex-shrink-0 flex flex-col items-center cursor-pointer active:scale-90 transition-transform">
+                    <div class="w-8 h-8 flex items-center justify-center">
+                        <i data-lucide="play" class="stroke-white w-4 h-4 drop-shadow-md"></i>
+                    </div>
+                </div>
+                <div id="progressBarContainer"
+                    class="relative flex-1 min-w-0 min-h-[2.25rem] flex items-center cursor-pointer touch-none select-none overflow-visible">
+                    <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-white/30 pointer-events-none"
+                        aria-hidden="true"></div>
+                    <div id="progressLine"
+                        class="progress-line pointer-events-none absolute left-0 top-1/2 max-w-full -translate-y-1/2 h-1 w-0 rounded-full bg-white">
+                    </div>
+                    <div id="progressThumb"
+                        class="absolute top-1/2 left-0 z-[12] h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_5px_rgba(0,0,0,.5)] ring-1 ring-white/40 touch-manipulation">
+                    </div>
+                </div>
             </div>
 
             <div class="flex justify-between text-xs text-gray-300 drop-shadow">
@@ -435,7 +459,7 @@
                     isAutoplay: true,
                     currentTab: 'home',
                     currentLibraryId: null,
-                    isScaleFill: true,
+                    isScaleFill: false,
                     isMuted: false,
                     lastReportTime: 0,
                     playSessionId: null,
@@ -496,6 +520,7 @@
                 if (this.dom.scaleBtn) {
                     this.dom.scaleBtn.innerHTML = `<div class="w-8 h-8 flex items-center justify-center"><i data-lucide="${this.state.isScaleFill ? 'maximize-2' : 'minimize-2'}" class="stroke-white w-4 h-4 drop-shadow-md"></i></div>`;
                 }
+                this.syncBottomPlayPauseIcon();
 
                 // 初始化视图模式按钮图标（默认竖版，显示gallery-vertical）
                 const viewBtn = this.dom.viewModeBtn;
@@ -569,7 +594,7 @@
             cacheDOM() {
                 const ids = [
                     'videoContainer', 'clickToPlayOverlay', 'loading', 'toast',
-                    'videoInfoArea', 'videoTitle', 'videoDescription', 'progressLine', 'currentTime', 'totalTime',
+                    'videoInfoArea', 'videoTitle', 'videoDescription', 'playPauseBtn', 'progressBarContainer', 'progressLine', 'progressThumb', 'currentTime', 'totalTime',
                     'playModeBtn', 'viewModeBtn', 'libraryBtn', 'myBtn',
                     'favoriteBtn', 'scaleBtn', 'muteBtn', 'fullscreenBtn', 'deleteBtn',
                     'mediaInfoModal', 'mediaInfoContent', 'closeMediaInfoBtn',
@@ -1221,6 +1246,7 @@
                     videoEl.style.opacity = '1';
                     if (!activeSlideVideo()) return;
                     this.reportPlayback('playing', videoEl);
+                    this.syncBottomPlayPauseIcon();
                     // autoplay 路径未必经过 playVideo()，在此启动自动清屏计时
                     this.showInterfaceTemp();
                 };
@@ -1243,7 +1269,9 @@
                     if (!activeSlideVideo()) return;
                     if (videoEl.duration) {
                         const pct = (videoEl.currentTime / videoEl.duration) * 100;
-                        this.dom.progressLine.style.width = `${pct}%`;
+                        if (!this.progressScrubbing) {
+                            this.updateProgressPercent(pct);
+                        }
                         this.dom.currentTime.textContent = this.formatTime(videoEl.currentTime);
                         this.dom.totalTime.textContent = this.formatTime(videoEl.duration);
                         this.reportPlayback('progress', videoEl);
@@ -1252,6 +1280,7 @@
                 videoEl.onpause = () => {
                     if (!activeSlideVideo()) return;
                     this.reportPlayback('pause', videoEl);
+                    this.syncBottomPlayPauseIcon();
                 };
                 videoEl.onseeked = () => {
                     if (!activeSlideVideo()) return;
@@ -1321,12 +1350,14 @@
                         playPromise.then(() => {
                             this.state.isPlaying = true;
                             if (btn) btn.classList.remove('paused');
+                            this.syncBottomPlayPauseIcon();
                             this.showInterfaceTemp();
                         }).catch(error => {
                             console.warn('播放被阻止(可能缺失交互):', error);
                             this.state.isPlaying = false;
                             this.toggleLoading(false);
                             if (btn) btn.classList.add('paused');
+                            this.syncBottomPlayPauseIcon();
 
                             // 降级：如果被浏览器强行阻止，弹出UI引导用户点击
                             if (error.name === 'NotAllowedError') {
@@ -1338,6 +1369,8 @@
                                 }
                             }
                         });
+                    } else {
+                        this.syncBottomPlayPauseIcon();
                     }
                 }
             }
@@ -1400,8 +1433,33 @@
                     this.state.isPlaying = false;
                     if (btn) btn.classList.add('paused');
                 }
+                this.syncBottomPlayPauseIcon();
             }
 
+            syncBottomPlayPauseIcon() {
+                const wrap = this.dom.playPauseBtn;
+                if (!wrap) return;
+                if (this.state.viewMode !== 'stream') return;
+                const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
+                const v = document.getElementById(`video-p${slideIdx}`);
+                const iconName = v && !v.paused ? 'pause' : 'play';
+                wrap.innerHTML = `<div class="w-8 h-8 flex items-center justify-center"><i data-lucide="${iconName}" class="stroke-white w-4 h-4 drop-shadow-md"></i></div>`;
+                lucide.createIcons({ nameAttr: 'data-lucide', nodes: [wrap] });
+            }
+
+            /** 进度条填充与圆点位置（0–100） */
+            updateProgressPercent(pct) {
+                const v = Math.max(0, Math.min(100, pct));
+                if (this.dom.progressLine) this.dom.progressLine.style.width = `${v}%`;
+                if (this.dom.progressThumb) this.dom.progressThumb.style.left = `${v}%`;
+            }
+
+            /** 拖拽进度时关闭 CSS 过渡，并与「画中横向拖拽 scrub」共用状态 */
+            setProgressScrubbing(on) {
+                this.progressScrubbing = !!on;
+                const bar = this.dom.progressBarContainer;
+                if (bar) bar.classList.toggle('progress-scrubbing', !!on);
+            }
 
 
             prevVideo() {
@@ -1837,6 +1895,7 @@
                     // 定向更新：只扫描 favBtn 内部，不全局扫描 DOM
                     lucide.createIcons({ nameAttr: 'data-lucide', nodes: [favBtn] });
                 }
+                this.syncBottomPlayPauseIcon();
             }
 
             updateTabHighlight() {
@@ -2215,6 +2274,15 @@
                     this.showInterfaceTemp();
                 };
 
+                if (this.dom.playPauseBtn) {
+                    this.dom.playPauseBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (this.state.viewMode !== 'stream') return;
+                        this.togglePlay();
+                        this.showInterfaceTemp();
+                    };
+                }
+
                 this.dom.videoInfoArea.onclick = (e) => {
                     e.stopPropagation();
                     const app = document.getElementById('app');
@@ -2400,49 +2468,53 @@
                     }
                 };
 
-                const progressBar = document.getElementById('progressBarContainer');
+                const progressBar = this.dom.progressBarContainer;
                 let progressBarPointerDown = false;
                 const scrubProgressFromX = (clientX) => {
+                    if (!progressBar) return;
                     const rect = progressBar.getBoundingClientRect();
+                    const w = rect.width || 1;
                     const slideIdx = (this.state.currentIndex % 3 + 3) % 3;
                     const v = document.getElementById(`video-p${slideIdx}`);
                     if (v && v.duration) {
-                        const t = ((clientX - rect.left) / rect.width) * v.duration;
-                        v.currentTime = Math.max(0, Math.min(t, v.duration));
-                        if (this.dom.progressLine) {
-                            this.dom.progressLine.style.width = `${(v.currentTime / v.duration) * 100}%`;
-                        }
+                        const ratio = (clientX - rect.left) / w;
+                        const t = Math.max(0, Math.min(ratio * v.duration, v.duration));
+                        v.currentTime = t;
+                        this.updateProgressPercent((t / v.duration) * 100);
+                        if (this.dom.currentTime) this.dom.currentTime.textContent = this.formatTime(t);
                     }
                 };
-                progressBar.addEventListener('pointerdown', (e) => {
-                    e.stopPropagation();
-                    if (e.button !== 0) return;
-                    progressBarPointerDown = true;
-                    this.progressScrubbing = true;
-                    const appEl = document.getElementById('app');
-                    appEl.classList.remove('interface-hidden');
-                    if (this.csTimer) clearTimeout(this.csTimer);
-                    try {
-                        progressBar.setPointerCapture(e.pointerId);
-                    } catch (_) { /* noop */ }
-                    scrubProgressFromX(e.clientX);
-                });
-                progressBar.addEventListener('pointermove', (e) => {
-                    if (!progressBarPointerDown) return;
-                    e.stopPropagation();
-                    scrubProgressFromX(e.clientX);
-                });
-                const progressBarPointerEnd = (e) => {
-                    if (!progressBarPointerDown) return;
-                    progressBarPointerDown = false;
-                    try {
-                        progressBar.releasePointerCapture(e.pointerId);
-                    } catch (_) { /* noop */ }
-                    this.progressScrubbing = false;
-                    this.showInterfaceTemp();
-                };
-                progressBar.addEventListener('pointerup', progressBarPointerEnd);
-                progressBar.addEventListener('pointercancel', progressBarPointerEnd);
+                if (progressBar) {
+                    progressBar.addEventListener('pointerdown', (e) => {
+                        e.stopPropagation();
+                        if (e.button !== 0) return;
+                        progressBarPointerDown = true;
+                        this.setProgressScrubbing(true);
+                        const appEl = document.getElementById('app');
+                        appEl.classList.remove('interface-hidden');
+                        if (this.csTimer) clearTimeout(this.csTimer);
+                        try {
+                            progressBar.setPointerCapture(e.pointerId);
+                        } catch (_) { /* noop */ }
+                        scrubProgressFromX(e.clientX);
+                    });
+                    progressBar.addEventListener('pointermove', (e) => {
+                        if (!progressBarPointerDown) return;
+                        e.stopPropagation();
+                        scrubProgressFromX(e.clientX);
+                    });
+                    const progressBarPointerEnd = (e) => {
+                        if (!progressBarPointerDown) return;
+                        progressBarPointerDown = false;
+                        try {
+                            progressBar.releasePointerCapture(e.pointerId);
+                        } catch (_) { /* noop */ }
+                        this.setProgressScrubbing(false);
+                        this.showInterfaceTemp();
+                    };
+                    progressBar.addEventListener('pointerup', progressBarPointerEnd);
+                    progressBar.addEventListener('pointercancel', progressBarPointerEnd);
+                }
 
                 // 统一的复杂手势拦截挂载 (长按, 拖拽, 双击)
                 const container = document.getElementById('app');
@@ -2819,7 +2891,7 @@
                     if (state === 'DRAG') {
                         if (e.cancelable) e.preventDefault();
                         if (!this.progressScrubbing) {
-                            this.progressScrubbing = true;
+                            this.setProgressScrubbing(true);
                             const appEl = document.getElementById('app');
                             appEl.classList.remove('interface-hidden');
                             if (this.csTimer) clearTimeout(this.csTimer);
@@ -2840,8 +2912,7 @@
                                 v.currentTime = targetTime;
                             } catch (_) { /* noop */ }
 
-                            const progressEl = document.getElementById('progressLine');
-                            if (progressEl) progressEl.style.width = `${(targetTime / v.duration) * 100}%`;
+                            this.updateProgressPercent((targetTime / v.duration) * 100);
 
                             if (this.dom.currentTime) this.dom.currentTime.textContent = this.formatTime(targetTime);
                         }
@@ -2892,7 +2963,7 @@
                         scrubPrepared = false;
                         scrubWasPlaying = false;
                         state = 'IDLE';
-                        this.progressScrubbing = false;
+                        this.setProgressScrubbing(false);
                         // 结束进度拖拽属于有效交互，重置/开始清屏计时
                         this.showInterfaceTemp();
                         return;
@@ -2964,7 +3035,7 @@
                     scrubWasPlaying = false;
 
                     if (this.progressScrubbing) {
-                        this.progressScrubbing = false;
+                        this.setProgressScrubbing(false);
                         this.showInterfaceTemp();
                     }
                 });
@@ -3098,6 +3169,7 @@
                     if (btn) btn.classList.remove('paused');
                 } else {
                     el.classList.add('hidden');
+                    this.syncBottomPlayPauseIcon();
                 }
             }
 
