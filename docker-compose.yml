@@ -2,15 +2,15 @@ version: '3.8'
 
 # 单容器：Node 托管 API + web 构建产物（镜像内 web-public），由反向代理路由到 8090
 services:
-  embyx-local:
+  embyx:
     image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:${TAG}
-    container_name: embyx-local
+    container_name: embyx
     restart: always
     # ports:
     #   - "8090:8090"
     # 环境变量默认见 Dockerfile 的 ENV；部署差异大时再写 environment 覆盖
     volumes:
-      - /vol2/1000/movie/短剧/11731-出山（70集）:/media
+      - /vol2/1000/z_vod/A-3000:/media
       - ./data:/data
     networks:
       - proxy

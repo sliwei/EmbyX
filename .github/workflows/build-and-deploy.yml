@@ -20,7 +20,7 @@ jobs:
       DOCKER_BUILDKIT: "1"
       REGISTRY: registry.cn-shenzhen.aliyuncs.com
       IMAGE: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local
-      DEPLOY_PATH: /data/docker/awei/embyx
+      DEPLOY_PATH: /vol1/1000/app/docker/embyx-local
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,8 +67,8 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            mkdir -p /data/docker/awei/embyx
-            cd /data/docker/awei/embyx
+            mkdir -p ${{ env.DEPLOY_PATH }}
+            cd ${{ env.DEPLOY_PATH }}
             printf '%s\n' "${{ secrets.DOCKER_PASSWORD }}" | docker login registry.cn-shenzhen.aliyuncs.com \
               -u "${{ secrets.DOCKER_USERNAME }}" \
               --password-stdin
