@@ -1,16 +1,21 @@
 import { Play } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 
 const DOUBLE_TAP_MS = 280;
 
 export function ClickToPlayOverlay() {
-  const viewMode = useAppStore((s) => s.viewMode);
-  const hasVideos = useAppStore((s) => s.videos.length > 0);
-  const clickToPlay = useAppStore((s) => s.clickToPlay);
-  const videoPaused = useAppStore((s) => s.videoPaused);
-  const setClickToPlay = useAppStore((s) => s.setClickToPlay);
-  const showInterfaceTemp = useAppStore((s) => s.showInterfaceTemp);
+  const { viewMode, hasVideos, clickToPlay, videoPaused, setClickToPlay, showInterfaceTemp } = useAppStore(
+    useShallow((s) => ({
+      viewMode: s.viewMode,
+      hasVideos: s.videos.length > 0,
+      clickToPlay: s.clickToPlay,
+      videoPaused: s.videoPaused,
+      setClickToPlay: s.setClickToPlay,
+      showInterfaceTemp: s.showInterfaceTemp,
+    }))
+  );
 
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickCount = useRef(0);
@@ -47,6 +52,7 @@ export function ClickToPlayOverlay() {
       <button
         type="button"
         className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center"
+        aria-label="双击开始播放"
         onPointerUp={onPointerUp}
       >
         <div className="text-center">

@@ -1,27 +1,43 @@
 import { Sparkles } from 'lucide-react';
+import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { posterForItem, useAppStore } from '../../stores/appStore';
 
 export function GridView() {
-  const serverBase = useAppStore((s) => s.serverBase);
-  const videos = useAppStore((s) => s.videos);
-  const totalCount = useAppStore((s) => s.totalCount);
-  const currentLibraryId = useAppStore((s) => s.currentLibraryId);
-  const currentIndex = useAppStore((s) => s.currentIndex);
-  const nextAfterId = useAppStore((s) => s.nextAfterId);
-
-  const setViewMode = useAppStore((s) => s.setViewMode);
-  const setCurrentIndex = useAppStore((s) => s.setCurrentIndex);
-  const refreshList = useAppStore((s) => s.refreshList);
-  const libraries = useAppStore((s) => s.libraries);
+  const {
+    serverBase,
+    videos,
+    totalCount,
+    currentLibraryId,
+    currentIndex,
+    nextAfterId,
+    setViewMode,
+    setCurrentIndex,
+    refreshList,
+    libraries,
+  } = useAppStore(
+    useShallow((s) => ({
+      serverBase: s.serverBase,
+      videos: s.videos,
+      totalCount: s.totalCount,
+      currentLibraryId: s.currentLibraryId,
+      currentIndex: s.currentIndex,
+      nextAfterId: s.nextAfterId,
+      setViewMode: s.setViewMode,
+      setCurrentIndex: s.setCurrentIndex,
+      refreshList: s.refreshList,
+      libraries: s.libraries,
+    }))
+  );
 
   const countStr = totalCount > 999 ? '999+' : String(totalCount);
 
-  let libraryName = '全部视频';
-  if (currentLibraryId === 'favorites') libraryName = '收藏夹';
-  else if (currentLibraryId) {
+  const libraryName = useMemo(() => {
+    if (currentLibraryId === 'favorites') return '收藏夹';
+    if (!currentLibraryId) return '全部视频';
     const lib = libraries.find((l) => l.id === currentLibraryId);
-    if (lib) libraryName = lib.name;
-  }
+    return lib?.name ?? '全部视频';
+  }, [currentLibraryId, libraries]);
 
   const item = videos[currentIndex];
   const bg = item ? posterForItem(serverBase, item.id) : '';

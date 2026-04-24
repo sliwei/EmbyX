@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { NormalizedVideo } from '../../types/media';
 import { posterForItem, streamUrl, useAppStore } from '../../stores/appStore';
 
@@ -35,19 +36,37 @@ function SlideVideo({
   zoomY: number;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const setProgressPercent = useAppStore((s) => s.setProgressPercent);
-  const setPlaybackTimes = useAppStore((s) => s.setPlaybackTimes);
-  const reportProgress = useAppStore((s) => s.reportProgress);
-  const progressScrubbing = useAppStore((s) => s.progressScrubbing);
-  const nextVideo = useAppStore((s) => s.nextVideo);
-  const viewMode = useAppStore((s) => s.viewMode);
-  const playMode = useAppStore((s) => s.playMode);
-  const sequenceAutoplay = useAppStore((s) => s.sequenceAutoplay);
-  const showInterfaceTemp = useAppStore((s) => s.showInterfaceTemp);
-  const setClickToPlay = useAppStore((s) => s.setClickToPlay);
-  const setLoading = useAppStore((s) => s.setLoading);
-  const setVideoPaused = useAppStore((s) => s.setVideoPaused);
-  const playToggleSeq = useAppStore((s) => s.playToggleSeq);
+  const {
+    setProgressPercent,
+    setPlaybackTimes,
+    reportProgress,
+    progressScrubbing,
+    nextVideo,
+    viewMode,
+    playMode,
+    sequenceAutoplay,
+    showInterfaceTemp,
+    setClickToPlay,
+    setLoading,
+    setVideoPaused,
+    playToggleSeq,
+  } = useAppStore(
+    useShallow((s) => ({
+      setProgressPercent: s.setProgressPercent,
+      setPlaybackTimes: s.setPlaybackTimes,
+      reportProgress: s.reportProgress,
+      progressScrubbing: s.progressScrubbing,
+      nextVideo: s.nextVideo,
+      viewMode: s.viewMode,
+      playMode: s.playMode,
+      sequenceAutoplay: s.sequenceAutoplay,
+      showInterfaceTemp: s.showInterfaceTemp,
+      setClickToPlay: s.setClickToPlay,
+      setLoading: s.setLoading,
+      setVideoPaused: s.setVideoPaused,
+      playToggleSeq: s.playToggleSeq,
+    }))
+  );
   const activeRef = useRef(active);
 
   const src = item ? streamUrl(serverBase, item.id) : '';
@@ -246,19 +265,37 @@ function SlideVideo({
 }
 
 export function StreamDeck() {
-  const serverBase = useAppStore((s) => s.serverBase);
-  const videos = useAppStore((s) => s.videos);
-  const currentIndex = useAppStore((s) => s.currentIndex);
-  const nextAfterId = useAppStore((s) => s.nextAfterId);
-  const isScaleFill = useAppStore((s) => s.isScaleFill);
-  const isMuted = useAppStore((s) => s.isMuted);
-  const nextVideo = useAppStore((s) => s.nextVideo);
-  const prevVideo = useAppStore((s) => s.prevVideo);
-  const showInterfaceTemp = useAppStore((s) => s.showInterfaceTemp);
-  const toggleInterfaceHidden = useAppStore((s) => s.toggleInterfaceHidden);
-  const viewMode = useAppStore((s) => s.viewMode);
-  const setProgressScrubbing = useAppStore((s) => s.setProgressScrubbing);
-  const setProgressPercent = useAppStore((s) => s.setProgressPercent);
+  const {
+    serverBase,
+    videos,
+    currentIndex,
+    nextAfterId,
+    isScaleFill,
+    isMuted,
+    nextVideo,
+    prevVideo,
+    showInterfaceTemp,
+    toggleInterfaceHidden,
+    viewMode,
+    setProgressScrubbing,
+    setProgressPercent,
+  } = useAppStore(
+    useShallow((s) => ({
+      serverBase: s.serverBase,
+      videos: s.videos,
+      currentIndex: s.currentIndex,
+      nextAfterId: s.nextAfterId,
+      isScaleFill: s.isScaleFill,
+      isMuted: s.isMuted,
+      nextVideo: s.nextVideo,
+      prevVideo: s.prevVideo,
+      showInterfaceTemp: s.showInterfaceTemp,
+      toggleInterfaceHidden: s.toggleInterfaceHidden,
+      viewMode: s.viewMode,
+      setProgressScrubbing: s.setProgressScrubbing,
+      setProgressPercent: s.setProgressPercent,
+    }))
+  );
 
   const x0 = useRef(0);
   const y0 = useRef(0);

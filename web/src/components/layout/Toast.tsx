@@ -1,8 +1,10 @@
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 
 export function Toast() {
-  const message = useAppStore((s) => s.toastMessage);
-  const visible = useAppStore((s) => s.toastVisible);
+  const { toastMessage: message, toastVisible: visible } = useAppStore(
+    useShallow((s) => ({ toastMessage: s.toastMessage, toastVisible: s.toastVisible }))
+  );
 
   return (
     <div

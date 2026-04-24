@@ -16,6 +16,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { formatTime } from '../../lib/formatTime';
 import { useAppStore } from '../../stores/appStore';
 
@@ -29,34 +30,65 @@ type IOSVideo = HTMLVideoElement & {
 };
 
 export function BottomChrome() {
-  const videos = useAppStore((s) => s.videos);
-  const currentIndex = useAppStore((s) => s.currentIndex);
-  const viewMode = useAppStore((s) => s.viewMode);
-  const playMode = useAppStore((s) => s.playMode);
-  const sequenceAutoplay = useAppStore((s) => s.sequenceAutoplay);
-  const interfaceHidden = useAppStore((s) => s.interfaceHidden);
-  const deleteMode = useAppStore((s) => s.deleteMode);
-  const progressPercent = useAppStore((s) => s.progressPercent);
-  const progressScrubbing = useAppStore((s) => s.progressScrubbing);
-  const videoPaused = useAppStore((s) => s.videoPaused);
-  const playbackCurrent = useAppStore((s) => s.playbackCurrent);
-  const playbackDuration = useAppStore((s) => s.playbackDuration);
-  const isMuted = useAppStore((s) => s.isMuted);
-  const isScaleFill = useAppStore((s) => s.isScaleFill);
-  const favorites = useAppStore((s) => s.favorites);
-
-  const setProgressScrubbing = useAppStore((s) => s.setProgressScrubbing);
-  const setProgressPercent = useAppStore((s) => s.setProgressPercent);
-  const setProfileOpen = useAppStore((s) => s.setProfileOpen);
-  const setLibraryOpen = useAppStore((s) => s.setLibraryOpen);
-  const setDeleteConfirmOpen = useAppStore((s) => s.setDeleteConfirmOpen);
-  const setViewMode = useAppStore((s) => s.setViewMode);
-  const cyclePlayControl = useAppStore((s) => s.cyclePlayControl);
-  const toggleMute = useAppStore((s) => s.toggleMute);
-  const toggleScale = useAppStore((s) => s.toggleScale);
-  const toggleFavorite = useAppStore((s) => s.toggleFavorite);
-  const showInterfaceTemp = useAppStore((s) => s.showInterfaceTemp);
-  const requestTogglePlay = useAppStore((s) => s.requestTogglePlay);
+  const {
+    videos,
+    currentIndex,
+    viewMode,
+    playMode,
+    sequenceAutoplay,
+    interfaceHidden,
+    deleteMode,
+    progressPercent,
+    progressScrubbing,
+    videoPaused,
+    playbackCurrent,
+    playbackDuration,
+    isMuted,
+    isScaleFill,
+    favorites,
+    setProgressScrubbing,
+    setProgressPercent,
+    setProfileOpen,
+    setLibraryOpen,
+    setDeleteConfirmOpen,
+    setViewMode,
+    cyclePlayControl,
+    toggleMute,
+    toggleScale,
+    toggleFavorite,
+    showInterfaceTemp,
+    requestTogglePlay,
+  } = useAppStore(
+    useShallow((s) => ({
+      videos: s.videos,
+      currentIndex: s.currentIndex,
+      viewMode: s.viewMode,
+      playMode: s.playMode,
+      sequenceAutoplay: s.sequenceAutoplay,
+      interfaceHidden: s.interfaceHidden,
+      deleteMode: s.deleteMode,
+      progressPercent: s.progressPercent,
+      progressScrubbing: s.progressScrubbing,
+      videoPaused: s.videoPaused,
+      playbackCurrent: s.playbackCurrent,
+      playbackDuration: s.playbackDuration,
+      isMuted: s.isMuted,
+      isScaleFill: s.isScaleFill,
+      favorites: s.favorites,
+      setProgressScrubbing: s.setProgressScrubbing,
+      setProgressPercent: s.setProgressPercent,
+      setProfileOpen: s.setProfileOpen,
+      setLibraryOpen: s.setLibraryOpen,
+      setDeleteConfirmOpen: s.setDeleteConfirmOpen,
+      setViewMode: s.setViewMode,
+      cyclePlayControl: s.cyclePlayControl,
+      toggleMute: s.toggleMute,
+      toggleScale: s.toggleScale,
+      toggleFavorite: s.toggleFavorite,
+      showInterfaceTemp: s.showInterfaceTemp,
+      requestTogglePlay: s.requestTogglePlay,
+    }))
+  );
 
   const item = videos[currentIndex];
   const hidden = interfaceHidden || viewMode === 'grid';
@@ -219,6 +251,9 @@ export function BottomChrome() {
           <div
             ref={barRef}
             role="slider"
+            aria-label="播放进度"
+            aria-valuemin={0}
+            aria-valuemax={100}
             aria-valuenow={Math.round(progressPercent)}
             tabIndex={0}
             className="relative flex min-h-[2.25rem] min-w-0 flex-1 cursor-pointer touch-none select-none items-center overflow-visible"

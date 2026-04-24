@@ -176,6 +176,7 @@ interface AppStore {
 
 let toastImpl: ToastFn = (msg) => console.info(msg);
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
+let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 let reportTimer: ReturnType<typeof setTimeout> | null = null;
 let lastReportKey = '';
 
@@ -231,9 +232,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   showToast: (msg) => {
+    if (toastHideTimer) {
+      clearTimeout(toastHideTimer);
+      toastHideTimer = null;
+    }
     toastImpl(msg);
     set({ toastMessage: msg, toastVisible: true });
-    setTimeout(() => set({ toastVisible: false }), 2200);
+    toastHideTimer = setTimeout(() => {
+      toastHideTimer = null;
+      set({ toastVisible: false });
+    }, 2200);
   },
 
   hydrateFromStorage: () => {

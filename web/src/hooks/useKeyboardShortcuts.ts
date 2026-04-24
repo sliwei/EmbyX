@@ -4,7 +4,9 @@ import { useAppStore } from '../stores/appStore';
 export function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      if (t instanceof HTMLElement && t.isContentEditable) return;
 
       const s = useAppStore.getState();
       const k = e.key.toLowerCase();
