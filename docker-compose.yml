@@ -6,8 +6,8 @@ services:
     image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:${TAG}
     container_name: embyx
     restart: always
-    # ports:
-    #   - "8090:8090"
+    ports:
+      - "8090:8090"
     # 环境变量默认见 Dockerfile 的 ENV；部署差异大时再写 environment 覆盖
     volumes:
       - /vol2/1000/z_vod/A-3000:/media
