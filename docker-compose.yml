@@ -1,5 +1,6 @@
 version: '3.8'
 
+# 单容器：Node 托管 API + web 构建产物（镜像内 web-public），由反向代理路由到 8090
 services:
   embyx-local:
     image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:${TAG}
@@ -7,17 +8,10 @@ services:
     restart: always
     # ports:
     #   - "8090:8090"
+    # 环境变量默认见 Dockerfile 的 ENV；部署差异大时再写 environment 覆盖
     volumes:
       - /vol2/1000/movie/短剧/11731-出山（70集）:/media
       - ./data:/data
-    environment:
-      - NODE_ENV=production
-      - PORT=8090
-      - MEDIA_ROOTS=/media
-      - DB_PATH=/data/app.db
-      - CACHE_DIR=/data/cache
-      - FFMPEG_CONCURRENCY=3
-      - SCAN_INTERVAL_MS=600000
     networks:
       - proxy
 

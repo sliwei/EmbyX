@@ -2,6 +2,8 @@
 # better-sqlite3 将报 invalid ELF header / ERR_DLOPEN_FAILED。
 node_modules
 server/node_modules
+web/node_modules
+web/dist
 
 # 本地运行产生的数据不应进入镜像
 server/data

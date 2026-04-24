@@ -1,6 +1,6 @@
 # 📱 EmbyX
 
-[中文说明](./README_zh.md)
+EmbyX 是一款专为 Emby / Jellyfin 打造的 Web 原生应用，完美复刻抖音·短视频沉浸式交互，让你的私人媒体库焕发全新的刷片体验。🎉
 
 [![GitHub Release](https://img.shields.io/github/v/release/juneix/embyx?style=flat-square&logo=github&color=52B54B)](https://github.com/juneix/embyx/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/juneix/embyx?style=flat-square&logo=github&color=52B54B)](https://github.com/juneix/embyx/stargazers)
@@ -9,131 +9,107 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-gray?style=flat-square)](./LICENSE)
 [![Code Size](https://img.shields.io/github/languages/code-size/juneix/embyx?style=flat-square&color=gray)](https://github.com/juneix/embyx)
 
-A TikTok-style web player for Emby / Jellyfin. Experience your private media library in a whole new, immersive way. 🎉
+![EmbyX-1](/poster1-zh.webp)
 
-![EmbyX-1](/poster1-en.webp)
+![EmbyX-2](/poster2-zh.webp)
 
-![EmbyX-2](/poster2-en.webp)
+## ✨ 功能特色
 
-## ✨ Features
-
-- **Fluid Playback**: TikTok-style vertical scrolling for an **immersive** experience.
-- **Direct Play**: Up to **8K HEVC / AV1** on Android—no transcoding.
-- **Poster Wall**: Elegant album view with pagination and **shuffle**.
-- **Emby Sync**: Real-time sync for **libraries, playlists, and favorites**.
-- **Desktop Friendly**: Optimized for **keyboard & mouse**, Perfect for TV and PC.
-- **PWA Ready**: Install as a **standalone** app on your home screen or desktop.
-- **Privacy First**: All data stays **on your device**, no cloud uploads.
+- **流式播放**：抖音操作习惯，沉浸式全屏体验
+- **直接播放**：安卓最高支持 8K AV1 不转码
+- **相册视图**：封面墙浏览，支持分页、换一批
+- **Emby 同步**：支持媒体库、播放列表、收藏夹
+- **键鼠适配**：纯按键控制，电脑、电视轻松摸鱼
+- **PWA 支持**：添加到主屏幕 / 作为应用安装
+- **隐私第一**：数据本地存储，绝不上传云端
 
 
-## 💡 Get Started
+## 💡 快速开始
 
-Try EmbyX instantly via the official web app:
-- 🌐 **Main Site** - [embyx.5nav.eu.org](https://embyx.5nav.eu.org)
-- ⚡ **Mirror Site** - [embyx.5nav.pp.ua](https://embyx.5nav.pp.ua)
+推荐直接访问我的 EmbyX 官方网站，开箱即用：
+- 🌐 **主站点** - [dy.5nav.eu.org](https://dy.5nav.eu.org)
+- ⚡ **镜像站** - [dy.5nav.pp.ua](https://dy.5nav.pp.ua)
 
-Prefer full control? You can **self-host** EmbyX on your own server.
-
-
-## 📢 Spread the Word
-
-If EmbyX makes your digital life easier, please `star it on GitHub ⭐️`, or share it with your friends and the community! As an independent developer, your support is the best way to help this project grow.
-
-> Love it? [Donations are welcome!](#❤️-support-the-project)
+喜欢完全控制？你也可以自托管 EmbyX 应用。
 
 
-## 🔮 Playback Performance
+## 📢 广而告之
 
-| Device | HEVC Decode | AV1 Decode |
+如果 EmbyX 让你的数字生活变得更轻松，请帮我点亮 GitHub ⭐️，或者把它安利给你的朋友！你也可以在 B 站、小红书、抖音或技术论坛（如 V2EX、LinuxDo、什么值得买、飞牛社区）上分享你的使用心得。作为独立开发者，大家的“自来水”是对我最好的支持。
+
+
+## ❤️ 支持项目
+
+- 打赏鼓励：支持我开发更多有趣应用
+- 互动群聊：加入 💬 [QQ 群](https://qm.qq.com/q/ZzOD5Qbhce) 可在线催更
+- 更多内容：访问 ➡️ [谢週五の藏经阁](https://5nav.eu.org)
+
+## 🔮 播放性能
+
+| 设备 | HEVC 硬解 | AV1 硬解 |
 |:---:|:---:|:---:|
-| Apple | A9 (2015) / M1 | A17 Pro (2023) / M3 |
-| Android | Budget Phones (2016) | Budget Phones (2024) |
-| PC | Intel 6-8th Gen iGPU | Intel 11th Gen+ iGPU |
+| 苹果 | A9 (2015) / M1 | A17 Pro (2023) / M3 |
+| 安卓 | 千元机 (2016) | 千元机 (2024) |
+| PC | 6～8 代酷睿·核显 | 11 代酷睿·核显 |
 
+---
 
-## ⌨️ Shortcuts Guide
+## ⌨️ 快捷键指南
 
-| Key | Function |
+| 按键 | 功能 |
 |:---:|---|
-| `W / S / ↑ / ↓` | Prev / Next Video |
-| `A / D / ← / →` | Rewind / Forward 15s |
-| `Space / Click OK` | Pause / Play |
-| `U / Double Click OK` | Favorite Video |
-| `J / Menu Key` | Toggle Aspect Ratio |
-| `M` | Toggle Mute |
-| `I` | Profile |
-| `E` | Toggle View |
-| `R` | Sequential / Random |
-| `F` | Toggle Fullscreen |
-| `G` | Select Libraries |
-| `V` | Media Info |
+| `W / S / ↑ / ↓` | 上一个 / 下一个视频 |
+| `A / D / ← / →` | 快退 / 快进 15 秒 |
+| `Space / 单击 OK` | 暂停 / 播放 |
+| `U / 双击 OK` | 收藏视频 |
+| `J / 菜单键` | 比例切换 |
+| `M` | 音量开关 |
+| `I` | 个人中心 |
+| `E` | 视图切换 |
+| `R` | 顺序 / 随机 |
+| `F` | 全屏切换 |
+| `G` | 选择媒体源 |
+| `V` | 流媒体详情 |
 
+---
 
-## 📁 Directory Structure
+## 📁 文件目录
 
 ```
 embyx/
-├── zh/               # Chinese Version
-├── README.md         # English Documentation (Default)
-├── README_zh.md      # Chinese Documentation
-├── Dockerfile        # Docker Image Build File
-├── docker-compose.yml # Docker Compose Configuration
-├── entrypoint.sh     # Docker Entrypoint
-└── nginx.conf        # Nginx configuration
+├── web/              # Vite + React 前端（根目录 `npm run dev` 同时跑前后端 / `npm run build`）
+├── server/           # Node API
+├── Dockerfile        # 生产镜像：API + 内置 web 静态资源
+├── docker-compose.yml
+├── README.md
+└── README_zh.md
 ```
 
+---
 
-## 🚀 Deployment
+## 🚀 部署方式
 
-### Option 1: Direct File Hosting (Recommended)
+### 方式一：Docker（推荐）
 
-Simply put all files from `zh/` folder into your web server (Nginx, Apache, etc.)
+使用本仓库根目录 `Dockerfile` 构建：Node 同时提供 API 与前端静态页（`web-public`）。部署参考 `docker-compose.yml`。
 
-### Option 2: Docker Deployment
+### 方式二：前后端分离（可选）
 
-Don't want to mess with the environment? Just use Docker. Recommended GHCR for updates, Docker Hub for NAS.
+API 容器设置 `SERVE_STATIC=0`；在 `web/` 执行 `npm run build`，将 `web/dist` 交给 Nginx 托管（可参考 `web/nginx.conf`）。
 
-- GHCR: `ghcr.io/juneix/embyx`
-- Docker Hub: `juneix/embyx`
+### 方式三：飞牛应用
 
-#### Docker CLI: 
+EmbyX 即将上架飞牛商店（审核中），加入交流群可下载 fpk 文件手动安装。
 
-```bash
-docker run -d \
-  --name embyx \
-  --network host \
-  -e APP_PORT=8090 \
-  ghcr.io/juneix/embyx
-```
-#### Docker Compose:
-```yaml
-services:
-  embyx:
-    image: ghcr.io/juneix/embyx
-    # image: juneix/embyx # Docker Hub Mirror 
-    container_name: embyx
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - APP_PORT=8090 # Access Port
-```
+### 社区镜像说明
 
-## ❤️ Support & Community
-
-If you find EmbyX useful, consider supporting its development or joining our community. Your word-of-mouth and support help this project grow!
-
-| Support | Community |
-| :--- | :--- |
-| [![Buy Me a Coffee](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/juneixtse) | [![Telegram Channel](https://img.shields.io/badge/Telegram-Join%20Channel-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/juneix_en) |
-| [![Donate with PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/juneixtse) | [![X (Twitter)](https://img.shields.io/badge/X-Follow%20Me-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/juneix_tse) |
-
-
+第三方镜像（如 `ghcr.io/juneix/embyx`）可能与本仓库行为不一致，建议以本仓库 `docker-compose.yml` 为准自行构建。
 
 ## 🌟 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=juneix/embyx&type=Date)](https://star-history.com/#juneix/embyx&Date)
 
 
-## 📝 License
+## 📝 开源协议
 
-MIT License — Feel free to use, PRs and Issues are welcome.
+MIT License — 随意使用，欢迎 PR 和 Issue。

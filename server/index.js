@@ -491,10 +491,7 @@ async function buildServer() {
       reply.type('image/webp');
       return reply.send(fs.createReadStream(legacyWebp));
     }
-    const roots = [
-      path.join(__dirname, 'zh-public', 'poster.webp'),
-      path.join(__dirname, '..', 'zh', 'poster.webp'),
-    ];
+    const roots = [path.join(__dirname, 'web-public', 'poster.webp')];
     for (const placeholder of roots) {
       if (fs.existsSync(placeholder)) {
         reply.type('image/webp');
@@ -515,17 +512,64 @@ async function buildServer() {
     return sendCoverOrPlaceholder(reply, id);
   });
 
-  const zhRoot = [process.env.ZH_STATIC_DIR, path.join(__dirname, 'zh-public'), path.join(__dirname, '..', 'zh')]
-    .filter(Boolean)
-    .find((p) => fs.existsSync(p));
+  /**
+   * SERVE_STATIC=0：仅 API。否则尝试 WEB_STATIC_DIR / web-public / 开发目录 web/dist。
+   */
+  const serveStatic =
+    process.env.SERVE_STATIC !== '0' && String(process.env.SERVE_STATIC).toLowerCase() !== 'false';
 
-  if (zhRoot) {
-    await app.register(fastifyStatic, {
-      root: zhRoot,
-      prefix: '/',
-      decorateReply: false,
-    });
-    app.log.info({ zhRoot }, 'static root');
+  if (!serveStatic) {
+    app.log.info('SERVE_STATIC 已关闭，仅提供 API（前端单独部署）');
+  } else {
+    const staticCandidates = [
+      process.env.WEB_STATIC_DIR,
+      path.join(__dirname, 'web-public'),
+      path.join(__dirname, '..', 'web', 'dist'),
+    ].filter(Boolean);
+
+    const staticRoot = staticCandidates.find((p) => fs.existsSync(p));
+    const isWebBundle =
+      staticRoot &&
+      (staticRoot === process.env.WEB_STATIC_DIR ||
+        staticRoot.endsWith(`${path.sep}web-public`) ||
+        staticRoot.endsWith(`${path.sep}dist`));
+
+    if (staticRoot) {
+      await app.register(fastifyStatic, {
+        root: staticRoot,
+        prefix: '/',
+        decorateReply: false,
+      });
+      app.log.info({ staticRoot, bundle: isWebBundle ? 'web' : 'custom' }, 'static root');
+      if (!isWebBundle) {
+        app.log.warn('静态根目录不是标准 web 产物，请确认 WEB_STATIC_DIR 指向含 index.html 的目录');
+      }
+      const indexHtml = path.join(staticRoot, 'index.html');
+      if (fs.existsSync(indexHtml)) {
+        const looksLikeStaticAsset = /\.(js|mjs|cjs|css|map|json|ico|png|jpe?g|gif|webp|svg|avif|woff2?|ttf|eot|txt|xml|webmanifest)$/i;
+        app.setNotFoundHandler((request, reply) => {
+          if (request.method !== 'GET' && request.method !== 'HEAD') {
+            reply.code(404);
+            return reply.send({ error: 'Not Found' });
+          }
+          const p = String(request.url || '').split('?')[0] || '/';
+          if (p.startsWith('/api/') || p.startsWith('/media/') || p.startsWith('/covers/')) {
+            reply.code(404);
+            return reply.send({ error: 'Not Found' });
+          }
+          if (looksLikeStaticAsset.test(p)) {
+            reply.code(404);
+            return reply.send('Not Found');
+          }
+          reply.type('text/html; charset=utf-8');
+          return reply.send(fs.createReadStream(indexHtml));
+        });
+      }
+    } else {
+      app.log.warn(
+        'SERVE_STATIC 已开启但未找到静态目录（web/dist 等）。请 build 前端或设置 WEB_STATIC_DIR；当前仅 API 可用'
+      );
+    }
   }
 
   await app.listen({ port: PORT, host: '0.0.0.0' });

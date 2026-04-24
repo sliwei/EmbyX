@@ -1,7 +1,7 @@
 ---
 description: 大体积 HTML / PWA / SW 编辑约定
 globs:
-  - "zh/**"
+  - "web/**"
 alwaysApply: false
 ---
 
