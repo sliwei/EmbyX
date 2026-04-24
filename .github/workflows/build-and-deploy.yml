@@ -1,0 +1,77 @@
+# Secrets：KEY、DOCKER_USERNAME、DOCKER_PASSWORD（与 p2p-transfer 一致）
+# DOCKER_USERNAME = 阿里云「登录镜像」用户名
+# 修改部署目标：改下方 host / username / port / script 内路径
+
+name: build-and-deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: "1"
+      REGISTRY: registry.cn-shenzhen.aliyuncs.com
+      IMAGE: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local
+      DEPLOY_PATH: /data/docker/awei/embyx
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Tag, login, build, push
+        id: tag
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${DOCKER_USERNAME:?在仓库 Settings → Secrets 添加 DOCKER_USERNAME}"
+          : "${DOCKER_PASSWORD:?在仓库 Settings → Secrets 添加 DOCKER_PASSWORD}"
+          TAG="live-$(date -u +'%Y%m%d%H%M%S')"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$DOCKER_PASSWORD" | docker login "$REGISTRY" \
+            -u "$DOCKER_USERNAME" \
+            --password-stdin
+          docker build -t "$IMAGE:$TAG" -f Dockerfile .
+          docker push "$IMAGE:$TAG"
+
+      - name: scp compose
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > /tmp/ci_deploy_key
+          ssh -i /tmp/ci_deploy_key -p 2222 -o StrictHostKeyChecking=accept-new \
+            root@bstu.cn "mkdir -p $DEPLOY_PATH"
+          scp -i /tmp/ci_deploy_key -P 2222 -o StrictHostKeyChecking=accept-new \
+            docker-compose.yml root@bstu.cn:"$DEPLOY_PATH/"
+          shred -u /tmp/ci_deploy_key 2>/dev/null || rm -f /tmp/ci_deploy_key
+
+      - name: SSH — pull & up
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: bstu.cn
+          username: root
+          key: ${{ secrets.KEY }}
+          port: 2222
+          script_stop: true
+          script: |
+            set -euo pipefail
+            mkdir -p /data/docker/awei/embyx
+            cd /data/docker/awei/embyx
+            printf '%s\n' "${{ secrets.DOCKER_PASSWORD }}" | docker login registry.cn-shenzhen.aliyuncs.com \
+              -u "${{ secrets.DOCKER_USERNAME }}" \
+              --password-stdin
+            export TAG=${{ steps.tag.outputs.tag }}
+            docker compose pull
+            docker compose up -d

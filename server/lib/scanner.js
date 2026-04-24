@@ -44,7 +44,11 @@ function syncLibrary(db, libraryId, mountPath) {
     ON CONFLICT(library_id, rel_path) DO UPDATE SET
       size_bytes = excluded.size_bytes,
       mtime_ms = excluded.mtime_ms,
-      indexed_at = excluded.indexed_at
+      indexed_at = excluded.indexed_at,
+      cover_ready = CASE
+        WHEN files.size_bytes != excluded.size_bytes OR files.mtime_ms != excluded.mtime_ms THEN 0
+        ELSE files.cover_ready
+      END
   `);
 
   const existing = db.prepare(`

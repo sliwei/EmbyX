@@ -30,21 +30,46 @@ function runFfmpeg(args) {
   });
 }
 
+const OUT_TAIL = (width, outPath) => [
+  '-frames:v', '1',
+  '-vf', `scale=${width}:-2`,
+  '-q:v', '4',
+  '-y',
+  outPath,
+];
+
 /** 输出 JPEG：不依赖 libwebp（Homebrew 部分 ffmpeg 构建未带 --enable-libwebp） */
 async function generateCover(absVideoPath, outPath, width = 480) {
   ensureDir(path.dirname(outPath));
-  await runFfmpeg([
+  const fastSeek = [
     '-nostdin',
     '-hide_banner',
     '-loglevel', 'error',
     '-ss', '00:00:01',
     '-i', absVideoPath,
-    '-frames:v', '1',
-    '-vf', `scale=${width}:-2`,
-    '-q:v', '4',
-    '-y',
-    outPath,
-  ]);
+    ...OUT_TAIL(width, outPath),
+  ];
+  try {
+    await runFfmpeg(fastSeek);
+    return;
+  } catch (e1) {
+    // 输入 seek 之后再解码，对部分怪异封装更宽容（无法修复真正缺 moov 的文件）
+    try {
+      await runFfmpeg([
+        '-nostdin',
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-err_detect', 'ignore_err',
+        '-fflags', '+discardcorrupt',
+        '-i', absVideoPath,
+        '-ss', '00:00:01',
+        ...OUT_TAIL(width, outPath),
+      ]);
+    } catch (e2) {
+      const msg = `${e1.message}\n${e2.message}`;
+      throw new Error(msg.slice(-800));
+    }
+  }
 }
 
 module.exports = { generateCover, ensureDir };

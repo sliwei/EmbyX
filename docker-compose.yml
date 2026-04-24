@@ -1,22 +1,26 @@
-services:
-  embyx:
-    # 飞牛 Intel：使用已推送的 amd64 镜像（本地构建推送见 scripts/docker-push-aliyun.sh）
-    image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:latest
-    container_name: embyx
-    restart: unless-stopped
-    ports:
-      - "8090:8090"
-    environment:
-      PORT: "8090"
-      MEDIA_ROOTS: "/media"
-      DB_PATH: "/data/app.db"
-      CACHE_DIR: "/data/cache"
-      FFMPEG_CONCURRENCY: "3"
-      SCAN_INTERVAL_MS: "600000"
-    volumes:
-      - embyx_data:/data
-      # 将飞牛/NAS 上的目录挂载到容器 /media（可挂载多个宿主路径需同步改 MEDIA_ROOTS）
-      # - /实际路径/短视频库:/media:ro
+version: '3.8'
 
-volumes:
-  embyx_data:
+services:
+  embyx-local:
+    image: registry.cn-shenzhen.aliyuncs.com/sliwei/embyx-local:${TAG}
+    container_name: embyx-local
+    restart: always
+    # ports:
+    #   - "8090:8090"
+    volumes:
+      - /vol2/1000/movie/短剧/11731-出山（70集）:/media
+      - ./data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=8090
+      - MEDIA_ROOTS=/media
+      - DB_PATH=/data/app.db
+      - CACHE_DIR=/data/cache
+      - FFMPEG_CONCURRENCY=3
+      - SCAN_INTERVAL_MS=600000
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

@@ -88,6 +88,8 @@ function rowToDto(row, playback) {
     mtime_ms: row.mtime_ms,
     size_bytes: row.size_bytes,
     cover_ready: row.cover_ready === 1,
+    /** 抽帧失败已放弃，不再后台重试；文件替换后扫描会重置 */
+    cover_failed: row.cover_ready === 2,
     position_ms: positionMs,
   };
 }
@@ -126,7 +128,9 @@ function scheduleCoverWork() {
           await generateCover(abs, out);
           db.prepare(`UPDATE files SET cover_ready = 1 WHERE id = ?`).run(row.id);
         } catch (e) {
-          if (!isMissingFfmpegError(e)) console.warn('cover failed', row.id, e.message);
+          if (isMissingFfmpegError(e)) return;
+          db.prepare(`UPDATE files SET cover_ready = 2 WHERE id = ?`).run(row.id);
+          console.warn('cover skipped', row.id, String(e.message || '').slice(-280));
         } finally {
           coverInflight.delete(row.id);
         }
